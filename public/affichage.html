@@ -97,8 +97,9 @@ document.getElementById('unlockBtn').addEventListener('click', () => {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
     audioUnlocked = true;
+    if (typeof window.unmuteLive === 'function') window.unmuteLive();
     if (typeof ytMuted !== 'undefined') { ytMuted = false; rebuildIframe(); }
-    if (typeof unmuteLive === 'function') unmuteLive();
+
     document.getElementById('unlockBtn').classList.add('hidden');
   } catch (e) {}
 });
@@ -260,21 +261,97 @@ if ('serviceWorker' in navigator) {
 
 
 <!-- === LIVE YOUTUBE DYNAMIQUE === -->
-<div id="liveContainer" style="position:fixed;bottom:16px;right:16px;width:320px;height:180px;border-radius:14px;overflow:hidden;border:1px solid #2a2a2a;background:#000;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:60">
-  <iframe id="ytLiveFrame"
-    width="320"
-    height="180"
-    src="https://www.youtube.com/embed/b-bK2Vn3D38?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0"
-    title="Live YouTube"
-    frameborder="0"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-    referrerpolicy="strict-origin-when-cross-origin"
-    allowfullscreen></iframe>
-</div>
+
 
 
 <!-- === LIVE YOUTUBE === -->
-<div id="ytContainer" style="position:fixed;bottom:16px;right:16px;width:320px;height:180px;border-radius:14px;overflow:hidden;border:1px solid #2a2a2a;background:#000;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:60"></div>
 
+
+
+<!-- === LIVE YOUTUBE === -->
+<div id="liveFrameWrapper" style="position:fixed;bottom:16px;right:16px;width:320px;height:180px;border-radius:14px;overflow:hidden;border:1px solid #2a2a2a;background:#000;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:60;">
+  <iframe id="liveFrame" width="320" height="180"
+    src="https://www.youtube.com/embed/b-bK2Vn3D38?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0"
+    title="Live YouTube" frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</div>
+
+<script>
+/* === LIVE YOUTUBE === */
+(function() {
+  let liveType = 'video';
+  let liveId = 'b-bK2Vn3D38';
+  let liveMuted = true;
+
+  function buildLiveUrl() {
+    const muteParam = liveMuted ? '1' : '0';
+    const common = 'autoplay=1&mute=' + muteParam + '&playsinline=1&modestbranding=1&rel=0';
+    if (liveType === 'playlist') {
+      return 'https://www.youtube.com/embed/videoseries?list=' + liveId + '&' + common;
+    }
+    return 'https://www.youtube.com/embed/' + liveId + '?' + common;
+  }
+
+  function updateLiveFrame() {
+    const wrapper = document.getElementById('liveFrameWrapper');
+    if (!wrapper) return;
+    wrapper.innerHTML = '';
+    const f = document.createElement('iframe');
+    f.width = '320';
+    f.height = '180';
+    f.frameBorder = '0';
+    f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    f.referrerPolicy = 'strict-origin-when-cross-origin';
+    f.allowFullscreen = true;
+    f.src = buildLiveUrl();
+    wrapper.appendChild(f);
+    console.log('[LIVE] Frame update: type=' + liveType + ' id=' + liveId + ' muted=' + liveMuted);
+  }
+
+  // Attendre que socket soit dispo
+  function hookSocket() {
+    if (typeof socket === 'undefined') {
+      setTimeout(hookSocket, 300);
+      return;
+    }
+
+    socket.on('music:state', function(state) {
+      if (!state) return;
+      let changed = false;
+      if (state.type && state.type !== liveType) { liveType = state.type; changed = true; }
+      const newId = (state.type === 'playlist' && state.playlistId) ? state.playlistId : state.videoId;
+      if (newId && newId !== liveId) { liveId = newId; changed = true; }
+      if (state.muted !== undefined && state.muted !== liveMuted) { liveMuted = state.muted; changed = true; }
+      const wrapper = document.getElementById('liveFrameWrapper');
+      if (wrapper) wrapper.style.display = state.hidden ? 'none' : 'block';
+      if (changed) updateLiveFrame();
+    });
+
+    socket.on('music:video-changed', function(state) {
+      if (!state) return;
+      if (state.type) liveType = state.type;
+      const newId = (state.type === 'playlist' && state.playlistId) ? state.playlistId : state.videoId;
+      if (newId) liveId = newId;
+      liveMuted = false;
+      const wrapper = document.getElementById('liveFrameWrapper');
+      if (wrapper) wrapper.style.display = 'block';
+      updateLiveFrame();
+    });
+
+    socket.on('music:reload', function() { updateLiveFrame(); });
+
+    setTimeout(function() { socket.emit('music:request-state'); }, 500);
+  }
+
+  hookSocket();
+
+  // Exposer pour le bouton "Activer le son"
+  window.unmuteLive = function() {
+    liveMuted = false;
+    updateLiveFrame();
+  };
+})();
+</script>
 </body>
 </html>
