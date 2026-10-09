@@ -88,6 +88,32 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 .confirm-modal .buttons .cancel{background:#f0f0f2;color:#111}
 .confirm-modal .buttons .danger{background:#ef4444;color:#fff}
 .modal-overlay.center{align-items:center}
+.stats-panel{position:fixed;inset:0;background:#f5f5f7;z-index:200;display:flex;flex-direction:column;animation:slideUp .2s ease;overflow-y:auto}
+.stats-header{background:#111;color:#fff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:1}
+.stats-header h2{font-size:18px;font-weight:800}
+.stats-header button{background:rgba(255,255,255,.15);border:none;color:#fff;width:40px;height:40px;border-radius:12px;font-size:22px;cursor:pointer;font-weight:700}
+.stats-content{padding:18px;max-width:640px;margin:0 auto;width:100%}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+@media(max-width:500px){.stats-grid{grid-template-columns:1fr}}
+.stat-box{background:#fff;border-radius:16px;padding:18px;text-align:center;border:1.5px solid #e5e5e5}
+.stat-box .label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px}
+.stat-box .value{font-size:32px;font-weight:900;font-family:'JetBrains Mono',monospace;color:#111}
+.stat-box .value.sm{font-size:22px}
+.stat-box .sub{font-size:12px;color:#888;margin-top:4px}
+.stats-section{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;border:1.5px solid #e5e5e5}
+.stats-section h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#888;font-weight:800;margin-bottom:14px}
+.bar-chart{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.bar-row .hour{font-family:'JetBrains Mono',monospace;font-weight:700;width:50px;color:#555}
+.bar-row .bar-bg{flex:1;height:24px;background:#f0f0f2;border-radius:6px;overflow:hidden;position:relative}
+.bar-row .bar-fill{height:100%;background:#22c55e;border-radius:6px;transition:width .4s ease;min-width:2px}
+.bar-row .count{font-family:'JetBrains Mono',monospace;font-weight:700;width:36px;text-align:right;color:#111}
+.history-list{display:flex;flex-direction:column;gap:8px}
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f5f5f7;border-radius:12px;font-size:13px}
+.history-item .num{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:16px;color:#111}
+.history-item .times{color:#666;font-size:11px;text-align:right;line-height:1.5}
+.history-item .times b{color:#111;font-weight:700}
+.empty-stats{text-align:center;color:#888;padding:30px;font-size:14px}
 </style>
 </head>
 <body>
@@ -127,6 +153,7 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
   <div class="t-top">
     <h2>PASSE</h2>
     <span id="countReady">0 prete</span>
+    <button class="icon-btn" onclick="openStats()" title="Statistiques">&#x1F4CA;</button>
     <button class="icon-btn" onclick="openResetConfirm()" title="Reset journee">&#x21BB;</button>
   </div>
   <div class="t-stats">
@@ -152,9 +179,7 @@ let lastNumber = parseInt(localStorage.getItem('hc_last_number') || '0', 10);
 
 let pendingQueue = JSON.parse(localStorage.getItem('hc_pending_queue') || '[]');
 
-function savePendingQueue() {
-  localStorage.setItem('hc_pending_queue', JSON.stringify(pendingQueue));
-}
+function savePendingQueue() { localStorage.setItem('hc_pending_queue', JSON.stringify(pendingQueue)); }
 
 function enqueueUpdate(data) {
   pendingQueue.push({ type: 'update-tickets', data, timestamp: Date.now() });
@@ -164,23 +189,18 @@ function enqueueUpdate(data) {
 
 function flushPendingQueue() {
   if (!isOnline || pendingQueue.length === 0) return;
-  console.log('[PASSE] Envoi de ' + pendingQueue.length + ' element(s) en attente');
   const badge = document.getElementById('connBadge');
   badge.classList.add('show', 'syncing');
   badge.textContent = 'Synchronisation...';
-
   socket.emit('tablet:update-tickets', { tickets });
   pendingQueue = [];
   savePendingQueue();
   updatePendingBadge();
-
   setTimeout(() => {
     badge.classList.remove('syncing');
     badge.classList.add('synced');
     badge.textContent = 'Synchronise';
-    setTimeout(() => {
-      badge.classList.remove('synced', 'show');
-    }, 1500);
+    setTimeout(() => badge.classList.remove('synced', 'show'), 1500);
   }, 300);
 }
 
@@ -226,14 +246,12 @@ function tryConnect() {
 }
 
 socket.on('connect', () => {
-  console.log('[PASSE] Connecte');
   isOnline = true;
   document.getElementById('connBadge').classList.remove('show');
   if (savedCode) socket.emit('tablet:connect', { code: savedCode });
 });
 
 socket.on('disconnect', () => {
-  console.log('[PASSE] Deconnecte');
   isOnline = false;
   updateStatus(false);
   updatePendingBadge();
@@ -248,7 +266,6 @@ socket.on('connect_error', () => {
 socket.on('tablet:connected', ({ tickets: t, lastNumber: ln }) => {
   savedCode = currentCode || savedCode;
   localStorage.setItem('hc_tablet_code', savedCode);
-
   if (pendingQueue.length === 0) {
     tickets = t || {};
     if (ln !== undefined && ln > lastNumber) {
@@ -256,20 +273,15 @@ socket.on('tablet:connected', ({ tickets: t, lastNumber: ln }) => {
       localStorage.setItem('hc_last_number', String(lastNumber));
     }
   }
-
   socket.emit('tablet:request-ready-times');
   document.getElementById('pairingView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
   updateStatus(true);
   render();
-
   if (pendingQueue.length > 0) flushPendingQueue();
 });
 
-socket.on('tablet:ready-times', (rt) => {
-  readyTimes = rt || {};
-  render();
-});
+socket.on('tablet:ready-times', (rt) => { readyTimes = rt || {}; render(); });
 
 socket.on('tablet:error', (msg) => {
   if (document.getElementById('mainView').classList.contains('hidden')) {
@@ -283,39 +295,29 @@ socket.on('tablet:error', (msg) => {
 });
 
 socket.on('tablet:day-reset', () => {
-  tickets = {};
-  readyTimes = {};
-  lastNumber = 0;
+  tickets = {}; readyTimes = {}; lastNumber = 0;
   localStorage.setItem('hc_last_number', '0');
   render();
   showToast('Journee reinitialisee');
 });
 
+socket.on('tablet:stats', (stats) => { renderStats(stats); });
+
 function updateStatus(online) {
   const statusEl = document.getElementById('sStatus');
   const textEl = document.getElementById('sStatusText');
   if (!statusEl) return;
-  if (online) {
-    statusEl.style.color = '#22c55e';
-    textEl.textContent = 'Connecte';
-  } else {
-    statusEl.style.color = '#ef4444';
-    textEl.textContent = 'Hors ligne';
-  }
+  if (online) { statusEl.style.color = '#22c55e'; textEl.textContent = 'Connecte'; }
+  else { statusEl.style.color = '#ef4444'; textEl.textContent = 'Hors ligne'; }
 }
 
-function vibrate(pattern) {
-  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
-}
+function vibrate(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} }
 
-/* ============ MODALE AJOUT ============ */
 let modalCode = '';
 
 function openAddModal() {
-  // Pre-remplir avec le prochain numero
   modalCode = String(lastNumber + 1);
   const suggested = lastNumber + 1;
-
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'modalOverlay';
@@ -347,11 +349,7 @@ function openAddModal() {
   document.getElementById('modalCancel').addEventListener('click', closeAddModal);
   document.getElementById('modalAddPrep').addEventListener('click', () => confirmAddModal('prep'));
   document.getElementById('modalAddReady').addEventListener('click', () => confirmAddModal('ready'));
-  document.getElementById('autoSuggest').addEventListener('click', () => {
-    modalCode = String(suggested);
-    updateModalDisplay();
-    vibrate(10);
-  });
+  document.getElementById('autoSuggest').addEventListener('click', () => { modalCode = String(suggested); updateModalDisplay(); vibrate(10); });
   updateModalDisplay();
 }
 
@@ -375,17 +373,13 @@ function confirmAddModal(status) {
   const n = parseInt(modalCode, 10);
   if (!n || tickets[n]) { alert('Numero invalide ou deja existant'); modalClear(); return; }
   tickets[n] = status;
-  if (n > lastNumber) {
-    lastNumber = n;
-    localStorage.setItem('hc_last_number', String(lastNumber));
-  }
+  if (n > lastNumber) { lastNumber = n; localStorage.setItem('hc_last_number', String(lastNumber)); }
   syncTickets();
   render();
   closeAddModal();
   if (status === 'ready') beep();
 }
 
-/* ============ RESET JOURNEE ============ */
 function openResetConfirm() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay center';
@@ -396,21 +390,15 @@ function openResetConfirm() {
     '<div class="buttons">' +
       '<button type="button" class="cancel" id="resetCancel">Annuler</button>' +
       '<button type="button" class="danger" id="resetConfirm">Reinitialiser</button>' +
-    '</div>' +
-  '</div>';
+    '</div></div>';
   document.body.appendChild(overlay);
   document.getElementById('resetCancel').addEventListener('click', () => overlay.remove());
   document.getElementById('resetConfirm').addEventListener('click', () => {
     overlay.remove();
-    // Reset local
-    tickets = {};
-    readyTimes = {};
-    lastNumber = 0;
+    tickets = {}; readyTimes = {}; lastNumber = 0;
     localStorage.setItem('hc_last_number', '0');
-    pendingQueue = [];
-    savePendingQueue();
+    pendingQueue = []; savePendingQueue();
     render();
-    // Envoyer au serveur
     socket.emit('tablet:reset-day');
     showToast('Journee reinitialisee');
   });
@@ -425,14 +413,10 @@ function showToast(msg) {
 }
 
 function syncTickets() {
-  if (isOnline && socket.connected) {
-    socket.emit('tablet:update-tickets', { tickets });
-  } else {
-    enqueueUpdate({ tickets });
-  }
+  if (isOnline && socket.connected) socket.emit('tablet:update-tickets', { tickets });
+  else enqueueUpdate({ tickets });
 }
 
-/* ============ RENDU ============ */
 function formatTime(ms) {
   if (!ms || ms < 0) return '00:00';
   const totalSec = Math.floor(ms / 1000);
@@ -506,6 +490,89 @@ function beep() {
     g.gain.setValueAtTime(.15, ctx.currentTime);
     o.start(); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + .35); o.stop(ctx.currentTime + .36);
   } catch (e) {}
+}
+
+/* ============ STATS ============ */
+function openStats() {
+  const panel = document.createElement('div');
+  panel.className = 'stats-panel';
+  panel.id = 'statsPanel';
+  panel.innerHTML = '<div class="stats-header">' +
+    '<h2>Statistiques du jour</h2>' +
+    '<button type="button" id="closeStats">&times;</button>' +
+  '</div>' +
+  '<div class="stats-content" id="statsContent">' +
+    '<div style="text-align:center;padding:40px;color:#888">Chargement...</div>' +
+  '</div>';
+  document.body.appendChild(panel);
+  document.getElementById('closeStats').addEventListener('click', () => panel.remove());
+  socket.emit('tablet:request-stats');
+}
+
+function fmtDur(ms) {
+  if (!ms || ms < 0) return '--';
+  const sec = Math.floor(ms / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m >= 60) { const h = Math.floor(m / 60); const mm = m % 60; return h + 'h ' + mm + 'm'; }
+  if (m > 0) return m + 'm ' + s + 's';
+  return s + 's';
+}
+
+function fmtHeure(ts) {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function renderStats(s) {
+  const content = document.getElementById('statsContent');
+  if (!content) return;
+  const hours = Object.keys(s.byHour).sort();
+  const maxCount = hours.length > 0 ? Math.max(...hours.map(h => s.byHour[h])) : 1;
+  let histogram = '';
+  if (hours.length === 0) histogram = '<div class="empty-stats">Aucune commande servie pour l\'instant</div>';
+  else {
+    histogram = '<div class="bar-chart">' + hours.map(h => {
+      const count = s.byHour[h];
+      const pct = Math.round((count / maxCount) * 100);
+      return '<div class="bar-row">' +
+        '<span class="hour">' + h + '</span>' +
+        '<div class="bar-bg"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+        '<span class="count">' + count + '</span>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+  let historyHtml = '';
+  if (s.recent.length === 0) historyHtml = '<div class="empty-stats">Aucun ticket servi</div>';
+  else {
+    historyHtml = '<div class="history-list">' + s.recent.map(t => {
+      let durPrep = (t.created && t.ready) ? fmtDur(t.ready - t.created) : '--';
+      let durWait = (t.ready && t.retrieved) ? fmtDur(t.retrieved - t.ready) : '--';
+      return '<div class="history-item">' +
+        '<span class="num">#' + t.num + '</span>' +
+        '<span class="times">' +
+          'Cree <b>' + fmtHeure(t.created) + '</b> - Prep <b>' + durPrep + '</b><br>' +
+          'Pret <b>' + fmtHeure(t.ready) + '</b> - Attente <b>' + durWait + '</b>' +
+        '</span>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+  content.innerHTML =
+    '<div class="stats-grid">' +
+      '<div class="stat-box"><div class="label">Tickets servis</div><div class="value">' + s.totalServed + '</div></div>' +
+      '<div class="stat-box"><div class="label">Temps moyen prep</div><div class="value sm">' + fmtDur(s.avgPrep) + '</div></div>' +
+      '<div class="stat-box"><div class="label">Temps moyen attente</div><div class="value sm">' + fmtDur(s.avgWait) + '</div></div>' +
+      '<div class="stat-box"><div class="label">Actuellement</div><div class="value sm">' + s.inProgress + ' <span style="font-size:12px;color:#888">en prep</span></div><div class="sub">' + s.readyNow + ' pretes</div></div>' +
+    '</div>' +
+    '<div class="stats-section"><h3>Activite par heure</h3>' + histogram + '</div>' +
+    '<div class="stats-section"><h3>Derniers tickets servis</h3>' + historyHtml + '</div>' +
+    '<div style="text-align:center;color:#888;font-size:11px;padding:10px">' +
+      (s.firstOrder ? 'Premiere commande : ' + fmtHeure(s.firstOrder) + ' - Derniere : ' + fmtHeure(s.lastOrder) : '') +
+    '</div>';
+  if (document.getElementById('statsPanel')) {
+    setTimeout(() => { if (document.getElementById('statsPanel')) socket.emit('tablet:request-stats'); }, 5000);
+  }
 }
 
 if ('serviceWorker' in navigator) {
