@@ -2,19 +2,15 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const fs = require('fs');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3002;
-const DATA_DIR = path.join(__dirname, 'data');
-const STATE_FILE = path.join(DATA_DIR, 'state.json');
+const MONGO_URL = process.env.MONGO_URL;
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-
-// Forcer l'UTF-8 sur les pages HTML
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') || req.path === '/' || !req.path.includes('.')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -26,10 +22,35 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] })
 app.get('/affichage', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affichage.html')));
 app.get('/passe', (req, res) => res.sendFile(path.join(__dirname, 'public', 'passe.html')));
 
+// ============================================================
+// MONGODB MODELS
+// ============================================================
+const TicketSchema = new mongoose.Schema({
+  num: { type: Number, required: true, index: true },
+  status: { type: String, enum: ['prep', 'ready'], default: 'prep' },
+  created: Date,
+  ready: Date,
+  retrieved: Date,
+  day: { type: String, index: true }  // format YYYY-MM-DD
+}, { timestamps: true });
+
+const Ticket = mongoose.model('Ticket', TicketSchema);
+
+const ConfigSchema = new mongoose.Schema({
+  key: { type: String, unique: true },
+  value: mongoose.Schema.Types.Mixed
+});
+
+const Config = mongoose.model('Config', ConfigSchema);
+
+// ============================================================
+// ETAT EN MEMOIRE (source de verite pour le temps reel)
+// ============================================================
 let state = {
   code: null,
   tickets: {},
   readyTimes: {},
+  createdTimes: {},
   lastNumber: 0,
   tvs: new Set(),
   tablets: new Set()
@@ -39,34 +60,92 @@ function generateCode() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-function loadState() {
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// ============================================================
+// PERSISTANCE MONGODB
+// ============================================================
+async function loadStateFromDB() {
   try {
-    if (fs.existsSync(STATE_FILE)) {
-      const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      state.code = data.code || generateCode();
-      state.tickets = data.tickets || {};
-      state.readyTimes = data.readyTimes || {};
-      state.lastNumber = data.lastNumber || 0;
-    } else {
-      state.code = generateCode();
+    // Charger le code d'appairage
+    let codeDoc = await Config.findOne({ key: 'pairing_code' });
+    if (!codeDoc) {
+      codeDoc = await Config.create({ key: 'pairing_code', value: generateCode() });
     }
+    state.code = codeDoc.value;
+
+    // Charger les tickets en cours (non recuperes)
+    const activeTickets = await Ticket.find({ retrieved: null });
+    activeTickets.forEach(t => {
+      state.tickets[t.num] = t.status;
+      if (t.created) state.createdTimes[t.num] = t.created.getTime();
+      if (t.ready) state.readyTimes[t.num] = t.ready.getTime();
+      if (t.num > state.lastNumber) state.lastNumber = t.num;
+    });
+
+    // Charger le lastNumber global
+    const lastNumDoc = await Config.findOne({ key: 'last_number' });
+    if (lastNumDoc) {
+      state.lastNumber = Math.max(state.lastNumber, lastNumDoc.value);
+    }
+
+    console.log('[DB] Etat charge: ' + activeTickets.length + ' tickets actifs, code=' + state.code);
   } catch (e) {
-    console.error('Erreur chargement state:', e);
-    state.code = generateCode();
+    console.error('[DB] Erreur chargement:', e);
+    if (!state.code) state.code = generateCode();
   }
 }
 
-function saveState() {
+async function savePairingCode() {
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify({
-      code: state.code,
-      tickets: state.tickets,
-      readyTimes: state.readyTimes,
-      lastNumber: state.lastNumber
-    }, null, 2));
-  } catch (e) { console.error('Erreur sauvegarde state:', e); }
+    await Config.findOneAndUpdate(
+      { key: 'pairing_code' },
+      { value: state.code },
+      { upsert: true }
+    );
+  } catch (e) { console.error('[DB] Erreur savePairingCode:', e); }
 }
 
+async function saveLastNumber() {
+  try {
+    await Config.findOneAndUpdate(
+      { key: 'last_number' },
+      { value: state.lastNumber },
+      { upsert: true }
+    );
+  } catch (e) { console.error('[DB] Erreur saveLastNumber:', e); }
+}
+
+// Cree ou met a jour un ticket en BDD
+async function upsertTicket(num, status, createdTs, readyTs) {
+  try {
+    const update = { status, day: todayKey() };
+    if (createdTs) update.created = new Date(createdTs);
+    if (readyTs) update.ready = new Date(readyTs);
+    await Ticket.findOneAndUpdate(
+      { num, retrieved: null },
+      { $set: update, $setOnInsert: { num } },
+      { upsert: true, new: true }
+    );
+  } catch (e) { console.error('[DB] Erreur upsertTicket:', e); }
+}
+
+// Marque un ticket comme recupere
+async function markRetrieved(num, retrievedTs) {
+  try {
+    await Ticket.findOneAndUpdate(
+      { num, retrieved: null },
+      { $set: { retrieved: new Date(retrievedTs) } }
+    );
+  } catch (e) { console.error('[DB] Erreur markRetrieved:', e); }
+}
+
+// ============================================================
+// SOCKET.IO
+// ============================================================
 io.on('connection', (socket) => {
   console.log('Connexion:', socket.id);
 
@@ -95,13 +174,27 @@ io.on('connection', (socket) => {
     socket.emit('tablet:ready-times', state.readyTimes);
   });
 
-  socket.on('tablet:update-tickets', ({ tickets }) => {
+  socket.on('tablet:request-stats', async () => {
+    socket.emit('tablet:stats', await getStats());
+  });
+
+  socket.on('tablet:update-tickets', async ({ tickets }) => {
     if (socket.role !== 'tablet') return;
     const now = Date.now();
     const prevTickets = state.tickets;
+
     const newReadyTimes = {};
+    const newCreatedTimes = {};
 
     Object.keys(tickets).forEach(num => {
+      if (prevTickets[num] === undefined) {
+        newCreatedTimes[num] = now;
+      } else if (state.createdTimes[num]) {
+        newCreatedTimes[num] = state.createdTimes[num];
+      } else {
+        newCreatedTimes[num] = now;
+      }
+
       if (tickets[num] === 'ready') {
         if (prevTickets[num] === 'ready' && state.readyTimes[num]) {
           newReadyTimes[num] = state.readyTimes[num];
@@ -111,14 +204,33 @@ io.on('connection', (socket) => {
       }
     });
 
-    // Mettre a jour lastNumber si un ticket est plus grand
-    Object.keys(tickets).forEach(num => {
+    // Detecter les tickets recuperes (supprimes) -> BDD
+    for (const num of Object.keys(prevTickets)) {
+      if (tickets[num] === undefined) {
+        await markRetrieved(parseInt(num, 10), now);
+      }
+    }
+
+    // Detecter les nouveaux tickets et changements de statut -> BDD
+    for (const num of Object.keys(tickets)) {
       const n = parseInt(num, 10);
-      if (!isNaN(n) && n > state.lastNumber) state.lastNumber = n;
-    });
+      const wasExisting = prevTickets[num] !== undefined;
+      const statusChanged = prevTickets[num] !== tickets[num];
+
+      if (!wasExisting || statusChanged) {
+        await upsertTicket(n, tickets[num], newCreatedTimes[num], newReadyTimes[num]);
+      }
+
+      if (n > state.lastNumber) {
+        state.lastNumber = n;
+      }
+    }
+
+    if (state.lastNumber > 0) await saveLastNumber();
 
     state.tickets = tickets;
     state.readyTimes = newReadyTimes;
+    state.createdTimes = newCreatedTimes;
 
     state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', {
       tickets: state.tickets,
@@ -130,16 +242,21 @@ io.on('connection', (socket) => {
         io.to(id).emit('tablet:ready-times', state.readyTimes);
       }
     });
-
-    saveState();
   });
 
-  // Reset de la journee
-  socket.on('tablet:reset-day', () => {
+  socket.on('tablet:reset-day', async () => {
     if (socket.role !== 'tablet') return;
     state.tickets = {};
     state.readyTimes = {};
+    state.createdTimes = {};
     state.lastNumber = 0;
+
+    // Supprimer tous les tickets non-recuperes en BDD
+    try {
+      await Ticket.deleteMany({ retrieved: null });
+    } catch (e) { console.error('[DB] Erreur reset:', e); }
+
+    await saveLastNumber();
 
     state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', {
       tickets: {},
@@ -150,8 +267,7 @@ io.on('connection', (socket) => {
       io.to(id).emit('tablet:day-reset');
     });
 
-    saveState();
-    console.log('Journee reinitialisee par ' + socket.id);
+    console.log('Journee reinitialisee');
   });
 
   socket.on('tv:request-state', () => {
@@ -171,8 +287,79 @@ io.on('connection', (socket) => {
   });
 });
 
-loadState();
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('Serveur demarre sur http://0.0.0.0:' + PORT);
-  console.log('Code appairage : ' + state.code);
-});
+// ============================================================
+// STATS depuis MongoDB
+// ============================================================
+async function getStats() {
+  try {
+    const day = todayKey();
+
+    const served = await Ticket.find({ day, retrieved: { $ne: null } }).sort({ retrieved: 1 });
+    const totalServed = served.length;
+
+    const prepDurations = served.filter(t => t.created && t.ready).map(t => t.ready.getTime() - t.created.getTime());
+    const avgPrep = prepDurations.length > 0 ? Math.round(prepDurations.reduce((a, b) => a + b, 0) / prepDurations.length) : 0;
+
+    const waitDurations = served.filter(t => t.ready && t.retrieved).map(t => t.retrieved.getTime() - t.ready.getTime());
+    const avgWait = waitDurations.length > 0 ? Math.round(waitDurations.reduce((a, b) => a + b, 0) / waitDurations.length) : 0;
+
+    const createdTimes = served.filter(t => t.created).map(t => t.created.getTime());
+    const firstOrder = createdTimes.length > 0 ? Math.min(...createdTimes) : null;
+    const lastOrder = createdTimes.length > 0 ? Math.max(...createdTimes) : null;
+
+    const byHour = {};
+    served.forEach(t => {
+      if (t.created) {
+        const key = String(t.created.getHours()).padStart(2, '0') + 'h';
+        byHour[key] = (byHour[key] || 0) + 1;
+      }
+    });
+
+    const recent = served.slice(-20).reverse().map(t => ({
+      num: t.num,
+      created: t.created ? t.created.getTime() : null,
+      ready: t.ready ? t.ready.getTime() : null,
+      retrieved: t.retrieved ? t.retrieved.getTime() : null
+    }));
+
+    const inProgress = Object.keys(state.tickets).filter(k => state.tickets[k] === 'prep').length;
+    const readyNow = Object.keys(state.tickets).filter(k => state.tickets[k] === 'ready').length;
+
+    return {
+      totalServed, inProgress, readyNow,
+      avgPrep, avgWait,
+      firstOrder, lastOrder,
+      byHour, recent,
+      now: Date.now()
+    };
+  } catch (e) {
+    console.error('[DB] Erreur getStats:', e);
+    return { totalServed: 0, inProgress: 0, readyNow: 0, avgPrep: 0, avgWait: 0, firstOrder: null, lastOrder: null, byHour: {}, recent: [], now: Date.now() };
+  }
+}
+
+// ============================================================
+// DEMARRAGE
+// ============================================================
+async function start() {
+  if (!MONGO_URL) {
+    console.error('ERREUR: MONGO_URL manquant');
+    process.exit(1);
+  }
+  try {
+    await mongoose.connect(MONGO_URL);
+    console.log('Connecte a MongoDB');
+    await loadStateFromDB();
+    await savePairingCode();
+  } catch (e) {
+    console.error('Erreur MongoDB:', e);
+    process.exit(1);
+  }
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('Serveur demarre sur http://0.0.0.0:' + PORT);
+    console.log('Code appairage : ' + state.code);
+  });
+}
+
+start();
