@@ -8,20 +8,37 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100vh}
-.top{background:#111;color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
-.top h1{font-size:20px;font-weight:900;letter-spacing:.05em}
-.top .actions{display:flex;gap:10px;align-items:center}
-.top button{background:#22c55e;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;transition:.15s;font-family:'Inter',sans-serif}
-.top button:hover{background:#16a34a;transform:translateY(-1px)}
-.top button.secondary{background:rgba(255,255,255,.1)}
-.top button.secondary:hover{background:rgba(255,255,255,.2)}
-.top .status{font-size:12px;color:#888;margin-left:10px}
-.top .status.online{color:#22c55e}
+
+/* === LOGIN === */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#111}
+.login-box{background:#1a1a1a;border-radius:24px;padding:40px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.login-box h1{color:#fff;font-size:24px;font-weight:900;margin-bottom:8px}
+.login-box p{color:#888;font-size:14px;margin-bottom:28px}
+.pin-display{display:flex;gap:10px;justify-content:center;margin-bottom:24px}
+.pin-box{width:56px;height:70px;background:#0a0a0a;border:2px solid #2a2a2a;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:#fff;transition:.15s}
+.pin-box.filled{border-color:#22c55e;color:#22c55e;background:#0f2917}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.numpad button{padding:20px 0;background:#0a0a0a;border:1.5px solid #2a2a2a;border-radius:14px;color:#fff;font-size:24px;font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:.1s}
+.numpad button:active{background:#22c55e;border-color:#22c55e;transform:scale(.95)}
+.login-error{color:#ef4444;font-size:13px;font-weight:700;min-height:20px;margin-top:8px}
+.login-info{color:#666;font-size:11px;margin-top:16px;line-height:1.6}
+
+/* === INTERFACE CAISSE === */
+.hidden{display:none !important}
+.top{background:#111;color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.top h1{font-size:18px;font-weight:900;letter-spacing:.05em}
+.top-right{display:flex;align-items:center;gap:12px}
+.top .status{font-size:12px;color:#22c55e;font-weight:700}
 .top .status.offline{color:#ef4444}
-.container{max-width:900px;margin:0 auto;padding:24px}
-.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#888;font-weight:800;margin-bottom:14px}
+.top button{background:rgba(255,255,255,.1);color:#fff;border:none;padding:10px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif}
+.top button:hover{background:rgba(255,255,255,.2)}
+.top button.green{background:#22c55e}
+.top button.green:hover{background:#16a34a}
+.container{max-width:960px;margin:0 auto;padding:24px}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#888;font-weight:800;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.section-title .count{background:#22c55e;color:#fff;padding:3px 10px;border-radius:99px;font-size:11px}
 .ticket-card{background:#fff;border:2px solid #e5e5e5;border-radius:20px;padding:20px;margin-bottom:14px;display:flex;align-items:center;gap:20px;transition:.2s}
-.ticket-card:hover{border-color:#22c55e;box-shadow:0 4px 20px rgba(34,197,94,.1)}
+.ticket-card:hover{border-color:#22c55e;box-shadow:0 4px 24px rgba(34,197,94,.12)}
 .ticket-card .big-num{font-family:'JetBrains Mono',monospace;font-weight:900;font-size:56px;color:#111;line-height:1;min-width:130px}
 .ticket-card .info{flex:1}
 .ticket-card .info .time-row{font-size:14px;color:#666;margin-bottom:4px}
@@ -29,38 +46,32 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 .ticket-card .info .waited{font-size:12px;color:#888;margin-top:6px}
 .ticket-card .info .waited.warn{color:#f59e0b;font-weight:700}
 .ticket-card .info .waited.danger{color:#ef4444;font-weight:700}
-.ticket-card .print-btn{background:#111;color:#fff;border:none;padding:14px 24px;border-radius:14px;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:8px}
+.ticket-card .print-btn{background:#111;color:#fff;border:none;padding:16px 28px;border-radius:14px;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:8px;white-space:nowrap}
 .ticket-card .print-btn:hover{background:#000;transform:translateY(-1px)}
 .empty{text-align:center;padding:60px 20px;color:#888}
-.empty .icon{font-size:64px;margin-bottom:16px}
-.empty h2{font-size:18px;font-weight:800;color:#111;margin-bottom:6px}
-.connection-badge{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;z-index:200;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
-.connection-badge.show{display:block}
+.empty .icon{font-size:72px;margin-bottom:16px;opacity:.4}
+.empty h2{font-size:20px;font-weight:800;color:#111;margin-bottom:6px}
+.empty p{font-size:14px}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:14px 24px;border-radius:99px;font-size:14px;font-weight:700;z-index:300;box-shadow:0 8px 24px rgba(34,197,94,.4);opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
 
-/* === ZONE D'IMPRESSION (cachée à l'écran) === */
+/* === IMPRESSION === */
 #printZone{display:none}
-
-/* === STYLES D'IMPRESSION === */
 @media print {
   body * { visibility: hidden; }
   #printZone, #printZone * { visibility: visible; }
   #printZone {
     display: block !important;
     position: absolute;
-    left: 0;
-    top: 0;
+    left: 0; top: 0;
     width: 80mm;
     padding: 4mm;
     font-family: 'Courier New', monospace;
     color: #000;
     background: #fff;
   }
-  .print-ticket {
-    text-align: center;
-    padding-bottom: 6mm;
-    border-bottom: 1px dashed #000;
-    margin-bottom: 4mm;
-  }
+  .print-ticket { text-align: center; padding-bottom: 6mm; border-bottom: 1px dashed #000; margin-bottom: 4mm; page-break-after: always; }
+  .print-ticket:last-child { page-break-after: auto; border-bottom: none; }
   .print-ticket .shop { font-size: 12pt; font-weight: bold; letter-spacing: .15em; margin-bottom: 3mm; }
   .print-ticket .big-num { font-size: 64pt; font-weight: bold; line-height: 1; margin: 3mm 0; letter-spacing: .05em; }
   .print-ticket .label { font-size: 9pt; margin-bottom: 2mm; }
@@ -73,92 +84,135 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 </head>
 <body>
 
-<div class="top">
-  <h1>HOCINE CHAPATI - CAISSE</h1>
-  <div class="actions">
-    <span class="status" id="status">●</span>
-    <button class="secondary" onclick="testPrint()">Test imprimante</button>
-    <button id="printAllBtn" onclick="printAll()">Tout imprimer</button>
+<!-- === ECRAN DE LOGIN === -->
+<div class="login-wrap" id="loginView">
+  <div class="login-box">
+    <h1>🔐 CAISSE</h1>
+    <p>Entrez le mot de passe</p>
+    <div class="pin-display" id="pinDisplay">
+      <div class="pin-box" data-idx="0"></div>
+      <div class="pin-box" data-idx="1"></div>
+      <div class="pin-box" data-idx="2"></div>
+      <div class="pin-box" data-idx="3"></div>
+    </div>
+    <div class="numpad" id="numpad">
+      <button type="button" onclick="pinPress('1')">1</button>
+      <button type="button" onclick="pinPress('2')">2</button>
+      <button type="button" onclick="pinPress('3')">3</button>
+      <button type="button" onclick="pinPress('4')">4</button>
+      <button type="button" onclick="pinPress('5')">5</button>
+      <button type="button" onclick="pinPress('6')">6</button>
+      <button type="button" onclick="pinPress('7')">7</button>
+      <button type="button" onclick="pinPress('8')">8</button>
+      <button type="button" onclick="pinPress('9')">9</button>
+      <button type="button" onclick="pinClear()">C</button>
+      <button type="button" onclick="pinPress('0')">0</button>
+      <button type="button" onclick="pinBack()">X</button>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-info">Mot de passe par defaut : 0000</div>
   </div>
 </div>
 
-<div class="connection-badge" id="connBadge">Hors ligne</div>
-
-<div class="container">
-  <div class="section-title">Tickets prets a imprimer</div>
-  <div id="list"><div class="empty"><div class="icon">👨‍🍳</div><h2>Aucun ticket pret</h2><p>En attente de la cuisine...</p></div></div>
+<!-- === INTERFACE CAISSE === -->
+<div id="caisseView" class="hidden">
+  <div class="top">
+    <h1>HOCINE CHAPATI - CAISSE</h1>
+    <div class="top-right">
+      <span class="status" id="status">●</span>
+      <button onclick="testPrint()">Test imprimante</button>
+      <button class="green" onclick="printAll()">🖨 Tout imprimer</button>
+      <button onclick="logout()">Deconnexion</button>
+    </div>
+  </div>
+  <div class="container">
+    <div class="section-title">
+      <span>Tickets prets a imprimer</span>
+      <span class="count" id="countReady">0</span>
+    </div>
+    <div id="list"></div>
+  </div>
 </div>
 
 <div id="printZone"></div>
+<div class="toast" id="toast">OK</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io({ reconnection: true, reconnectionDelay: 1000, reconnectionAttempts: Infinity });
 let tickets = {};
 let readyTimes = {};
-let createdTimes = {};
 let isOnline = false;
+let pin = '';
 
-const savedCode = localStorage.getItem('hc_caisse_code') || localStorage.getItem('hc_tablet_code') || '';
+/* === LOGIN === */
+function updatePinDisplay() {
+  document.querySelectorAll('.pin-box').forEach((b, i) => {
+    b.textContent = i < pin.length ? '•' : '';
+    b.classList.toggle('filled', i < pin.length);
+  });
+}
+function pinPress(n) {
+  if (pin.length >= 4) return;
+  pin += n;
+  updatePinDisplay();
+  if (pin.length === 4) setTimeout(tryLogin, 250);
+}
+function pinClear() { pin = ''; updatePinDisplay(); document.getElementById('loginError').textContent = ''; }
+function pinBack() { pin = pin.slice(0, -1); updatePinDisplay(); document.getElementById('loginError').textContent = ''; }
+function tryLogin() {
+  socket.emit('caisse:login', { password: pin });
+}
 
+socket.on('caisse:login-ok', () => {
+  localStorage.setItem('hc_caisse_ok', '1');
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('caisseView').classList.remove('hidden');
+  socket.emit('caisse:request-state');
+  showToast('Connecte a la caisse');
+});
+
+socket.on('caisse:login-error', (msg) => {
+  document.getElementById('loginError').textContent = msg;
+  pin = '';
+  updatePinDisplay();
+  document.getElementById('numpad').style.animation = 'shake .3s';
+  setTimeout(() => document.getElementById('numpad').style.animation = '', 300);
+});
+
+/* === RECONNEXION AUTO === */
 socket.on('connect', () => {
   isOnline = true;
-  document.getElementById('connBadge').classList.remove('show');
-  setStatus(true);
-  // Se connecter comme tablette pour recevoir les tickets
-  if (savedCode) {
-    socket.emit('tablet:connect', { code: savedCode });
+  document.getElementById('status').textContent = '● Connecte';
+  document.getElementById('status').className = 'status';
+  // Si deja logge, on se reconnecte automatiquement
+  if (localStorage.getItem('hc_caisse_ok') === '1') {
+    socket.emit('caisse:login', { password: '0000' });
   }
 });
 
 socket.on('disconnect', () => {
   isOnline = false;
-  document.getElementById('connBadge').classList.add('show');
-  setStatus(false);
+  document.getElementById('status').textContent = '● Hors ligne';
+  document.getElementById('status').className = 'status offline';
 });
 
-socket.on('connect_error', () => {
-  isOnline = false;
-  document.getElementById('connBadge').classList.add('show');
-  setStatus(false);
+socket.on('caisse:tickets-updated', ({ tickets: t, readyTimes: rt }) => {
+  tickets = t || {};
+  readyTimes = rt || {};
+  render();
 });
 
-function setStatus(online) {
-  const s = document.getElementById('status');
-  s.textContent = online ? '● Connecte' : '● Hors ligne';
-  s.className = 'status ' + (online ? 'online' : 'offline');
+/* === LOGOUT === */
+function logout() {
+  localStorage.removeItem('hc_caisse_ok');
+  socket.disconnect();
+  socket.connect();
+  document.getElementById('loginView').classList.remove('hidden');
+  document.getElementById('caisseView').classList.add('hidden');
+  pin = '';
+  updatePinDisplay();
 }
-
-socket.on('tablet:connected', ({ tickets: t, lastNumber }) => {
-  tickets = t || {};
-  // On a besoin du code sauvegarde
-  if (!savedCode && lastNumber) {
-    console.log('Code non sauvegarde, demandez a la tablette');
-  }
-  socket.emit('tablet:request-ready-times');
-  render();
-});
-
-socket.on('tablet:ready-times', (rt) => {
-  readyTimes = rt || {};
-  render();
-});
-
-socket.on('tv:tickets-updated', ({ tickets: t, readyTimes: rt }) => {
-  tickets = t || {};
-  readyTimes = rt || {};
-  render();
-});
-
-socket.on('tablet:error', (msg) => {
-  console.log('Erreur:', msg);
-  // Si le code est invalide, demander a l'utilisateur
-  const code = prompt('Entrez le code affiche sur la TV pour connecter la caisse:');
-  if (code && code.length === 4) {
-    localStorage.setItem('hc_caisse_code', code);
-    socket.emit('tablet:connect', { code });
-  }
-});
 
 /* === RENDU === */
 function formatTime(ms) {
@@ -166,36 +220,28 @@ function formatTime(ms) {
   const totalSec = Math.floor(ms / 1000);
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    const mm = m % 60;
-    return h + 'h' + String(mm).padStart(2, '0');
-  }
+  if (m >= 60) { const h = Math.floor(m / 60); const mm = m % 60; return h + 'h' + String(mm).padStart(2,'0'); }
   return m + 'm ' + String(s).padStart(2, '0') + 's';
 }
-
 function fmtHeure(ts) {
   if (!ts) return '--:--';
   const d = new Date(ts);
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
-
 function getWaitClass(ms) {
   const sec = Math.floor(ms / 1000);
   if (sec < 120) return '';
   if (sec < 300) return 'warn';
   return 'danger';
 }
-
 function render() {
   const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready').sort((a, b) => a - b);
   const list = document.getElementById('list');
-
+  document.getElementById('countReady').textContent = readyList.length;
   if (readyList.length === 0) {
     list.innerHTML = '<div class="empty"><div class="icon">👨‍🍳</div><h2>Aucun ticket pret</h2><p>En attente de la cuisine...</p></div>';
     return;
   }
-
   list.innerHTML = readyList.map(num => {
     const readyTs = readyTimes[num];
     const waitMs = readyTs ? Date.now() - readyTs : 0;
@@ -209,26 +255,19 @@ function render() {
       '<button class="print-btn" onclick="printTicket(' + num + ')">🖨 Imprimer</button>' +
     '</div>';
   }).join('');
-
   updateTimers();
 }
-
 function updateTimers() {
-  const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready');
-  const cards = document.querySelectorAll('.ticket-card');
-  cards.forEach((card, i) => {
+  const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready').sort((a, b) => a - b);
+  document.querySelectorAll('.ticket-card').forEach((card, i) => {
     const num = readyList[i];
     if (num && readyTimes[num]) {
       const waitMs = Date.now() - readyTimes[num];
       const el = card.querySelector('.waited');
-      if (el) {
-        el.textContent = 'En attente depuis ' + formatTime(waitMs);
-        el.className = 'waited ' + getWaitClass(waitMs);
-      }
+      if (el) { el.textContent = 'En attente depuis ' + formatTime(waitMs); el.className = 'waited ' + getWaitClass(waitMs); }
     }
   });
 }
-
 setInterval(updateTimers, 1000);
 
 /* === IMPRESSION === */
@@ -236,7 +275,6 @@ function buildPrintHTML(nums) {
   const now = new Date();
   const dateStr = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
   const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-
   return nums.map(num => {
     const readyTs = readyTimes[num];
     return '<div class="print-ticket">' +
@@ -252,24 +290,18 @@ function buildPrintHTML(nums) {
     '</div>';
   }).join('');
 }
-
 function printTicket(num) {
-  const zone = document.getElementById('printZone');
-  zone.innerHTML = buildPrintHTML([num]);
-  setTimeout(() => { window.print(); }, 100);
+  document.getElementById('printZone').innerHTML = buildPrintHTML([num]);
+  setTimeout(() => window.print(), 100);
 }
-
 function printAll() {
   const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready').sort((a, b) => a - b);
-  if (readyList.length === 0) { alert('Aucun ticket a imprimer'); return; }
-  const zone = document.getElementById('printZone');
-  zone.innerHTML = buildPrintHTML(readyList);
-  setTimeout(() => { window.print(); }, 100);
+  if (readyList.length === 0) { showToast('Aucun ticket a imprimer', true); return; }
+  document.getElementById('printZone').innerHTML = buildPrintHTML(readyList);
+  setTimeout(() => window.print(), 100);
 }
-
 function testPrint() {
-  const zone = document.getElementById('printZone');
-  zone.innerHTML = '<div class="print-ticket">' +
+  document.getElementById('printZone').innerHTML = '<div class="print-ticket">' +
     '<div class="shop">HOCINE CHAPATI</div>' +
     '<div class="sep"></div>' +
     '<div class="label">TEST IMPRIMANTE</div>' +
@@ -278,10 +310,22 @@ function testPrint() {
     '<div class="time">' + new Date().toLocaleString('fr-FR') + '</div>' +
     '<div class="footer">*** TEST ***</div>' +
   '</div>';
-  setTimeout(() => { window.print(); }, 100);
+  setTimeout(() => window.print(), 100);
+}
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#ef4444' : '#22c55e';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
 }
 
-render();
+// Si deja connecte (localStorage), on cache direct l'ecran de login
+if (localStorage.getItem('hc_caisse_ok') === '1') {
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('caisseView').classList.remove('hidden');
+}
+updatePinDisplay();
 </script>
 </body>
 </html>

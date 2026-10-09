@@ -9,6 +9,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3002;
+const CAISSE_PASSWORD = '0000';
 const MONGO_URL = process.env.MONGO_URL;
 
 app.use((req, res, next) => {
@@ -51,6 +52,7 @@ let state = {
   createdTimes: {},
   lastNumber: 0,
   tvs: new Set(),
+  caisseSockets: new Set(),
   tablets: new Set()
 };
 
@@ -235,6 +237,22 @@ io.on('connection', (socket) => {
     else if (action === 'unmute') { liveState.muted = false; io.emit('music:state', liveState); }
     else if (action === 'hide') { liveState.hidden = true; io.emit('music:state', liveState); }
     else if (action === 'show') { liveState.hidden = false; io.emit('music:state', liveState); }
+  });
+  // === CAISSE ===
+  socket.on('caisse:login', ({ password }) => {
+    if (password !== CAISSE_PASSWORD) {
+      return socket.emit('caisse:login-error', 'Mot de passe incorrect');
+    }
+    state.caisseSockets.add(socket.id);
+    socket.role = 'caisse';
+    socket.emit('caisse:login-ok');
+    socket.emit('caisse:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
+    console.log('Caisse connectee (total: ' + state.caisseSockets.size + ')');
+  });
+
+  socket.on('caisse:request-state', () => {
+    if (socket.role !== 'caisse') return;
+    socket.emit('caisse:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
   });
   socket.on('disconnect', () => {
     if (socket.role === 'tv') state.tvs.delete(socket.id);
