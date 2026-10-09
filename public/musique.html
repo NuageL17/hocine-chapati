@@ -13,23 +13,29 @@ h1{font-size:22px;font-weight:900;text-align:center;margin-bottom:6px}
 .sub{text-align:center;color:#888;font-size:13px;margin-bottom:24px}
 .card{background:#1a1a1a;border-radius:18px;padding:20px;margin-bottom:16px;border:1.5px solid #2a2a2a}
 .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#888;margin-bottom:14px;font-weight:800}
-.card input{width:100%;padding:16px;border-radius:12px;background:#0a0a0a;border:2px solid #2a2a2a;color:#fff;font-size:15px;font-family:'Inter',sans-serif;outline:none;margin-bottom:12px}
-.card input:focus{border-color:#22c55e}
-.card button{width:100%;padding:16px;border-radius:12px;background:#22c55e;color:#fff;border:none;font-weight:800;font-size:15px;cursor:pointer;font-family:'Inter',sans-serif}
+.card input,.card textarea{width:100%;padding:16px;border-radius:12px;background:#0a0a0a;border:2px solid #2a2a2a;color:#fff;font-size:15px;font-family:'Inter',sans-serif;outline:none;margin-bottom:12px;resize:vertical}
+.card textarea{min-height:80px;font-family:monospace;font-size:13px}
+.card input:focus,.card textarea:focus{border-color:#22c55e}
+.card button{width:100%;padding:16px;border-radius:12px;background:#22c55e;color:#fff;border:none;font-weight:800;font-size:15px;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:8px}
 .card button:active{background:#16a34a;transform:scale(.98)}
-.card button.secondary{background:#2a2a2a;margin-top:8px}
+.card button.secondary{background:#2a2a2a}
 .card button.secondary:active{background:#333}
 .current{background:#0a0a0a;border-radius:12px;padding:14px;margin-bottom:14px;font-size:13px}
 .current .label{color:#888;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;font-weight:700}
-.current .value{font-family:monospace;color:#22c55e;word-break:break-all;font-size:12px}
-.quick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.quick button{padding:14px;border-radius:12px;background:#0a0a0a;border:1.5px solid #2a2a2a;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif}
+.current .value{font-family:monospace;color:#22c55e;word-break:break-all;font-size:13px}
+.type-badge{display:inline-block;background:#22c55e;color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;margin-left:6px;letter-spacing:.05em}
+.type-badge.playlist{background:#f59e0b}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.quick button{padding:14px;border-radius:12px;background:#0a0a0a;border:1.5px solid #2a2a2a;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;margin:0}
 .quick button:active{background:#22c55e;border-color:#22c55e}
 .quick button.danger:active{background:#ef4444;border-color:#ef4444}
-.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:12px 20px;border-radius:99px;font-size:14px;font-weight:700;z-index:100;box-shadow:0 8px 24px rgba(34,197,94,.3);opacity:0;transition:.3s;pointer-events:none}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#22c55e;color:#fff;padding:12px 20px;border-radius:99px;font-size:14px;font-weight:700;z-index:100;box-shadow:0 8px 24px rgba(34,197,94,.3);opacity:0;transition:.3s;pointer-events:none;max-width:90%}
 .toast.show{opacity:1}
+.toast.error{background:#ef4444}
 .status{text-align:center;font-size:12px;color:#22c55e;margin-bottom:20px;font-weight:700}
 .status.offline{color:#ef4444}
+.examples{font-size:11px;color:#666;line-height:1.7;margin-top:6px;padding:10px;background:#0a0a0a;border-radius:10px}
+.examples code{color:#22c55e;font-size:10px}
 </style>
 </head>
 <body>
@@ -42,25 +48,36 @@ h1{font-size:22px;font-weight:900;text-align:center;margin-bottom:6px}
 <div class="card">
   <h2>En ce moment sur la TV</h2>
   <div class="current">
-    <div class="label">Video ID</div>
+    <div class="label">Contenu actuel <span class="type-badge" id="currentType">--</span></div>
     <div class="value" id="currentId">--</div>
   </div>
 </div>
 
 <div class="card">
-  <h2>Changer la video</h2>
-  <input type="text" id="urlInput" placeholder="Colle un lien YouTube ici..." value="">
-  <button onclick="changeVideo()">Changer sur la TV</button>
+  <h2>Changer la musique</h2>
+  <input type="text" id="urlInput" placeholder="Colle un lien YouTube, playlist ou live..." value="">
+  <button onclick="changeVideo()">▶ Changer sur la TV</button>
+  <div class="examples">
+    <b>Formats acceptes :</b><br>
+    <code>youtube.com/watch?v=XXXX</code> (video)<br>
+    <code>youtu.be/XXXX</code> (video)<br>
+    <code>youtube.com/live/XXXX</code> (live)<br>
+    <code>youtube.com/playlist?list=XXXX</code> (playlist)<br>
+    <code>XXXX</code> (ID direct)
+  </div>
 </div>
 
 <div class="card">
   <h2>Raccourcis</h2>
   <div class="quick">
-    <button onclick="reloadIframe()">🔄 Recharger</button>
-    <button onclick="muteIframe()">🔇 Muet</button>
-    <button onclick="unmuteIframe()">🔊 Son</button>
-    <button class="danger" onclick="hideIframe()">❌ Masquer</button>
-    <button onclick="showIframe()" style="grid-column:span 2">👁 Afficher</button>
+    <button onclick="cmd('reload')">🔄 Recharger</button>
+    <button onclick="cmd('next')">⏭ Suivant</button>
+    <button onclick="cmd('pause')">⏸ Pause</button>
+    <button onclick="cmd('play')">▶ Play</button>
+    <button onclick="cmd('mute')">🔇 Muet</button>
+    <button onclick="cmd('unmute')">🔊 Son</button>
+    <button onclick="cmd('hide')">❌ Masquer</button>
+    <button onclick="cmd('show')">👁 Afficher</button>
   </div>
 </div>
 
@@ -69,7 +86,6 @@ h1{font-size:22px;font-weight:900;text-align:center;margin-bottom:6px}
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io({ reconnection: true, reconnectionAttempts: Infinity });
-let currentVideoId = '';
 
 socket.on('connect', () => {
   document.getElementById('status').textContent = '● Connecte';
@@ -83,64 +99,99 @@ socket.on('disconnect', () => {
 });
 
 socket.on('music:state', (state) => {
-  if (state && state.videoId) {
-    currentVideoId = state.videoId;
-    document.getElementById('currentId').textContent = state.videoId;
-    document.getElementById('urlInput').value = 'https://www.youtube.com/watch?v=' + state.videoId;
-  }
+  if (!state) return;
+  updateCurrent(state);
+  if (state.url) document.getElementById('urlInput').value = state.url;
 });
 
 socket.on('music:video-changed', (state) => {
-  if (state && state.videoId) {
-    currentVideoId = state.videoId;
-    document.getElementById('currentId').textContent = state.videoId;
-    showToast('Video mise a jour');
-  }
+  updateCurrent(state);
+  showToast('TV mise a jour');
 });
 
-function extractYoutubeId(input) {
+function updateCurrent(state) {
+  if (!state) return;
+  const idEl = document.getElementById('currentId');
+  const typeEl = document.getElementById('currentType');
+  if (state.videoId) {
+    idEl.textContent = state.videoId;
+  } else if (state.playlistId) {
+    idEl.textContent = state.playlistId;
+  } else {
+    idEl.textContent = '--';
+  }
+  typeEl.textContent = state.type || '--';
+  typeEl.className = 'type-badge' + (state.type === 'playlist' ? ' playlist' : '');
+}
+
+function detectYoutube(input) {
   input = input.trim();
-  // Deja un ID (11 caracteres)
-  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
-  // URL with watch?v=
-  let m = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
-  if (m) return m[1];
-  // URL live
+  if (!input) return null;
+
+  // Playlist : youtube.com/playlist?list=XXX
+  let m = input.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+  if (m && input.includes('playlist')) {
+    return { type: 'playlist', id: m[1] };
+  }
+
+  // Playlist avec video : watch?v=XXX&list=YYY
+  if (m && input.includes('watch')) {
+    // On prefere lire la playlist
+    return { type: 'playlist', id: m[1] };
+  }
+
+  // Live : youtube.com/live/XXX
   m = input.match(/\/live\/([a-zA-Z0-9_-]{11})/);
-  if (m) return m[1];
-  // URL embed
+  if (m) return { type: 'video', id: m[1] };
+
+  // Embed : youtube.com/embed/XXX
   m = input.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
-  if (m) return m[1];
-  // URL youtu.be
+  if (m) return { type: 'video', id: m[1] };
+
+  // Watch : youtube.com/watch?v=XXX
+  m = input.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (m) return { type: 'video', id: m[1] };
+
+  // Short : youtu.be/XXX
   m = input.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
-  if (m) return m[1];
+  if (m) return { type: 'video', id: m[1] };
+
+  // ID video direct (11 caracteres)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return { type: 'video', id: input };
+
+  // ID playlist direct (commence par PL, LL, UU, etc.)
+  if (/^(PL|LL|UU|RD|OL)[a-zA-Z0-9_-]+$/.test(input)) return { type: 'playlist', id: input };
+
+  // Mix : RD + ID
+  if (/^RD[a-zA-Z0-9_-]+$/.test(input)) return { type: 'playlist', id: input };
+
   return null;
 }
 
 function changeVideo() {
   const input = document.getElementById('urlInput').value;
-  const id = extractYoutubeId(input);
-  if (!id) {
+  const detected = detectYoutube(input);
+  if (!detected) {
     showToast('Lien invalide', true);
     return;
   }
-  socket.emit('music:set-video', { videoId: id });
-  currentVideoId = id;
-  document.getElementById('currentId').textContent = id;
-  showToast('Video changee sur la TV');
+  socket.emit('music:set-video', {
+    type: detected.type,
+    id: detected.id,
+    url: input
+  });
+  showToast('Envoi a la TV...');
 }
 
-function reloadIframe() { socket.emit('music:action', { action: 'reload' }); showToast('Rechargement'); }
-function muteIframe() { socket.emit('music:action', { action: 'mute' }); showToast('Muet'); }
-function unmuteIframe() { socket.emit('music:action', { action: 'unmute' }); showToast('Son active'); }
-function hideIframe() { socket.emit('music:action', { action: 'hide' }); showToast('Masque'); }
-function showIframe() { socket.emit('music:action', { action: 'show' }); showToast('Affiche'); }
+function cmd(action) {
+  socket.emit('music:action', { action });
+  showToast('Commande : ' + action);
+}
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.style.background = isError ? '#ef4444' : '#22c55e';
-  t.classList.add('show');
+  t.className = 'toast show' + (isError ? ' error' : '');
   setTimeout(() => t.classList.remove('show'), 1800);
 }
 </script>

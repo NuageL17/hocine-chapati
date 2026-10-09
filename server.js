@@ -42,7 +42,7 @@ const ConfigSchema = new mongoose.Schema({
 
 const Config = mongoose.model('Config', ConfigSchema);
 
-let liveState = { videoId: 'b-bK2Vn3D38', muted: false, hidden: false };
+let liveState = { type: 'video', videoId: 'b-bK2Vn3D38', playlistId: null, url: '', muted: true, hidden: false };
 
 let state = {
   code: null,
@@ -207,21 +207,34 @@ io.on('connection', (socket) => {
     socket.emit('music:state', liveState);
   });
 
-  socket.on('music:set-video', ({ videoId }) => {
-    liveState.videoId = videoId;
+  socket.on('music:set-video', ({ type, id, url }) => {
+    if (type === 'playlist') {
+      liveState.type = 'playlist';
+      liveState.playlistId = id;
+      liveState.videoId = null;
+    } else {
+      liveState.type = 'video';
+      liveState.videoId = id;
+      liveState.playlistId = null;
+    }
+    liveState.url = url || '';
     liveState.hidden = false;
+    liveState.muted = false;
     io.emit('music:state', liveState);
     io.emit('music:video-changed', liveState);
-    console.log('[MUSIC] Video changee: ' + videoId);
+    console.log('[MUSIC] Changement: type=' + type + ' id=' + id);
   });
 
   socket.on('music:action', ({ action }) => {
+    console.log('[MUSIC] Action: ' + action);
     if (action === 'reload') io.emit('music:reload');
+    else if (action === 'pause') { liveState.paused = true; io.emit('music:state', liveState); }
+    else if (action === 'play') { liveState.paused = false; io.emit('music:state', liveState); }
+    else if (action === 'next') io.emit('music:next');
     else if (action === 'mute') { liveState.muted = true; io.emit('music:state', liveState); }
     else if (action === 'unmute') { liveState.muted = false; io.emit('music:state', liveState); }
     else if (action === 'hide') { liveState.hidden = true; io.emit('music:state', liveState); }
     else if (action === 'show') { liveState.hidden = false; io.emit('music:state', liveState); }
-    console.log('[MUSIC] Action: ' + action);
   });
   socket.on('disconnect', () => {
     if (socket.role === 'tv') state.tvs.delete(socket.id);
