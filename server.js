@@ -21,6 +21,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/affichage', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affichage.html')));
 app.get('/passe', (req, res) => res.sendFile(path.join(__dirname, 'public', 'passe.html')));
+app.get('/musique', (req, res) => res.sendFile(path.join(__dirname, 'public', 'musique.html')));
 app.get('/caisse', (req, res) => res.sendFile(path.join(__dirname, 'public', 'caisse.html')));
 
 const TicketSchema = new mongoose.Schema({
@@ -40,6 +41,8 @@ const ConfigSchema = new mongoose.Schema({
 });
 
 const Config = mongoose.model('Config', ConfigSchema);
+
+let liveState = { videoId: 'b-bK2Vn3D38', muted: false, hidden: false };
 
 let state = {
   code: null,
@@ -121,6 +124,7 @@ io.on('connection', (socket) => {
     state.tvs.add(socket.id);
     socket.role = 'tv';
     socket.emit('tv:registered', { code: state.code });
+    socket.emit('music:state', liveState);
     socket.emit('tv:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
     if (state.tablets.size > 0) socket.emit('tv:tablet-connected');
   });
@@ -198,6 +202,27 @@ io.on('connection', (socket) => {
     socket.emit('tv:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
   });
 
+  // === MUSIQUE LIVE ===
+  socket.on('music:request-state', () => {
+    socket.emit('music:state', liveState);
+  });
+
+  socket.on('music:set-video', ({ videoId }) => {
+    liveState.videoId = videoId;
+    liveState.hidden = false;
+    io.emit('music:state', liveState);
+    io.emit('music:video-changed', liveState);
+    console.log('[MUSIC] Video changee: ' + videoId);
+  });
+
+  socket.on('music:action', ({ action }) => {
+    if (action === 'reload') io.emit('music:reload');
+    else if (action === 'mute') { liveState.muted = true; io.emit('music:state', liveState); }
+    else if (action === 'unmute') { liveState.muted = false; io.emit('music:state', liveState); }
+    else if (action === 'hide') { liveState.hidden = true; io.emit('music:state', liveState); }
+    else if (action === 'show') { liveState.hidden = false; io.emit('music:state', liveState); }
+    console.log('[MUSIC] Action: ' + action);
+  });
   socket.on('disconnect', () => {
     if (socket.role === 'tv') state.tvs.delete(socket.id);
     else if (socket.role === 'tablet') {
