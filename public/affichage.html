@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Affichage TV - Hocine Chapati</title>
+<link rel="manifest" href="/manifest-affichage.json">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -44,29 +48,29 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex
 <div class="tv-head">
   <b>HOCINE CHAPATI</b>
   <div class="tv-head-right">
-    <button id="unlockBtn">ðŸ”Š Activer le son</button>
+    <button id="unlockBtn">Activer le son</button>
     <span id="clock">--:--</span>
   </div>
 </div>
 <div class="tv-main">
   <div class="pairing" id="pairing">
     <div class="spinner"></div>
-    <h2>En attente de la tablettea€¦</h2>
+    <h2>En attente de la tablette...</h2>
     <p>Ouvrez l'application sur la tablette et entrez le code</p>
     <div style="margin-top:26px;font-size:14px;color:#555">Code d'appairage :</div>
     <div class="code" id="pairingCode">----</div>
   </div>
   <div id="ticketsView">
     <div class="pulse" id="pulse" style="display:none"></div>
-    <div class="tv-num" id="tvNum" style="color:#333">a€”</div>
+    <div class="tv-num" id="tvNum" style="color:#333">--</div>
     <div class="tv-timer" id="tvTimer" style="display:none">
-      <span class="label">TEMPS Ã‰COULÃ‰</span>
+      <span class="label">TEMPS ECOULE</span>
       <span id="tvTimerValue">00:00</span>
     </div>
-    <div class="tv-ready" id="tvReady" style="display:none">aœ... PRÃŠTE</div>
-    <div class="tv-sub" id="tvSub">En attente de commandesa€¦</div>
+    <div class="tv-ready" id="tvReady" style="display:none">PRETE</div>
+    <div class="tv-sub" id="tvSub">En attente de commandes...</div>
     <div class="tv-list">
-      <h3>Commandes prÃªtes a€” RÃ©cupÃ©rez au comptoir</h3>
+      <h3>Commandes pretes - Recuperez au comptoir</h3>
       <div class="chips" id="chips"><span class="empty">Aucune pour l'instant</span></div>
     </div>
   </div>
@@ -125,7 +129,6 @@ socket.on('tv:tablet-disconnected', () => {
   previousReadySet = new Set();
 });
 
-// --- Utilitaires chrono ---
 function formatTime(ms) {
   if (!ms || ms < 0) return '00:00';
   const totalSec = Math.floor(ms / 1000);
@@ -141,13 +144,12 @@ function formatTime(ms) {
 
 function getTimerColor(elapsedMs) {
   const sec = Math.floor(elapsedMs / 1000);
-  if (sec < 120) return '#22c55e';       // < 2 min : vert
-  if (sec < 300) return '#f59e0b';       // 2-5 min : orange
-  return '#ef4444';                       // > 5 min : rouge
+  if (sec < 120) return '#22c55e';
+  if (sec < 300) return '#f59e0b';
+  return '#ef4444';
 }
 
 function updateTimers() {
-  // Timer principal
   const tvTimer = document.getElementById('tvTimer');
   const tvTimerValue = document.getElementById('tvTimerValue');
   if (lastReady && currentReadyTimes[lastReady]) {
@@ -158,8 +160,6 @@ function updateTimers() {
   } else {
     tvTimer.style.display = 'none';
   }
-
-  // Timers des chips
   document.querySelectorAll('.chip').forEach(chip => {
     const num = chip.dataset.num;
     if (currentReadyTimes[num]) {
@@ -185,9 +185,9 @@ function renderTV() {
 
   if (readyList.length === 0) {
     chips.innerHTML = '<span class="empty">Aucune pour l\'instant</span>';
-    tvNum.textContent = 'a€”'; tvNum.style.color = '#333';
+    tvNum.textContent = '--'; tvNum.style.color = '#333';
     tvReady.style.display = 'none'; pulse.style.display = 'none';
-    tvSub.textContent = 'En attente de commandesa€¦';
+    tvSub.textContent = 'En attente de commandes...';
     tvSub.style.color = '#aaa'; tvSub.style.fontWeight = '400';
     document.getElementById('tvTimer').style.display = 'none';
   } else {
@@ -202,7 +202,7 @@ function renderTV() {
     const last = lastReady || readyList[readyList.length - 1];
     tvNum.textContent = '#' + last; tvNum.style.color = '#fff';
     tvReady.style.display = 'block'; pulse.style.display = 'block';
-    tvSub.textContent = 'RÃ©cupÃ©rez votre commande au comptoir';
+    tvSub.textContent = 'Recuperez votre commande au comptoir';
     tvSub.style.color = '#22c55e'; tvSub.style.fontWeight = '800';
   }
   updateTimers();
@@ -229,8 +229,7 @@ function beepTV() {
     }, 200);
   } catch (e) {}
 }
-</script>
-<script>
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
