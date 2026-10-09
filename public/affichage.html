@@ -18,6 +18,8 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex
 .tv-head-right{display:flex;align-items:center;gap:14px}
 #unlockBtn{background:#22c55e;color:#fff;border:none;padding:7px 14px;border-radius:99px;font-weight:700;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif}
 #unlockBtn.hidden{display:none}
+.conn-badge{background:#ef4444;color:#fff;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;display:none}
+.conn-badge.show{display:block}
 .tv-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:hidden}
 .pairing{text-align:center;width:100%}
 .pairing h2{font-size:20px;color:#888;margin-bottom:20px;font-weight:600}
@@ -48,6 +50,7 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex
 <div class="tv-head">
   <b>HOCINE CHAPATI</b>
   <div class="tv-head-right">
+    <span class="conn-badge" id="connBadge">Hors ligne</span>
     <button id="unlockBtn">Activer le son</button>
     <span id="clock">--:--</span>
   </div>
@@ -77,11 +80,12 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex
 </div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+const socket = io({ reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000, reconnectionAttempts: Infinity });
 let lastReady = null;
 let currentTickets = {};
 let currentReadyTimes = {};
 let previousReadySet = new Set();
+let hasBeenConnected = false;
 
 setInterval(() => {
   document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -97,13 +101,27 @@ document.getElementById('unlockBtn').addEventListener('click', () => {
   } catch (e) {}
 });
 
-socket.emit('tv:register');
+socket.on('connect', () => {
+  console.log('[TV] Connecte au serveur');
+  document.getElementById('connBadge').classList.remove('show');
+  socket.emit('tv:register');
+});
+
+socket.on('disconnect', () => {
+  console.log('[TV] Deconnecte');
+  document.getElementById('connBadge').classList.add('show');
+});
+
+socket.on('connect_error', () => {
+  document.getElementById('connBadge').classList.add('show');
+});
 
 socket.on('tv:registered', ({ code }) => {
   document.getElementById('pairingCode').textContent = code;
 });
 
 socket.on('tv:tablet-connected', () => {
+  hasBeenConnected = true;
   document.getElementById('pairing').style.display = 'none';
   document.getElementById('ticketsView').style.display = 'flex';
   socket.emit('tv:request-state');
@@ -120,13 +138,12 @@ socket.on('tv:tickets-updated', ({ tickets, readyTimes }) => {
     lastReady = [...newReadySet].sort((a, b) => b - a)[0];
     beepTV();
   }
+  // Si on recoit des tickets, c'est qu'on est connecte
+  if (Object.keys(tickets).length > 0 || hasBeenConnected) {
+    document.getElementById('pairing').style.display = 'none';
+    document.getElementById('ticketsView').style.display = 'flex';
+  }
   renderTV();
-});
-
-socket.on('tv:tablet-disconnected', () => {
-  document.getElementById('pairing').style.display = 'block';
-  document.getElementById('ticketsView').style.display = 'none';
-  previousReadySet = new Set();
 });
 
 function formatTime(ms) {
@@ -172,7 +189,6 @@ function updateTimers() {
     }
   });
 }
-
 setInterval(updateTimers, 1000);
 
 function renderTV() {
