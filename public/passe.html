@@ -29,9 +29,11 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 .confirm-btn:disabled{opacity:.3;cursor:not-allowed;background:#ccc}
 .confirm-btn:active:not(:disabled){transform:scale(.98)}
 .error{color:#ef4444;font-size:14px;margin-top:14px;text-align:center;font-weight:600;min-height:20px}
-.t-top{background:#111;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
-.t-top h2{font-size:17px;font-weight:800}
+.t-top{background:#111;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.t-top h2{font-size:17px;font-weight:800;flex:1}
 .t-top span{font-size:13px;background:#22c55e;color:#fff;padding:5px 12px;border-radius:99px;font-weight:700}
+.icon-btn{background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:10px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.icon-btn:active{background:rgba(255,255,255,.2);transform:scale(.95)}
 .t-stats{display:flex;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e5e5e5}
 .stat{flex:1;background:#f5f5f7;border-radius:14px;padding:10px;text-align:center}
 .stat b{font-size:22px;display:block}
@@ -65,7 +67,9 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .modal{background:#f5f5f7;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:560px;animation:slideUp .2s ease;max-height:95vh;overflow-y:auto}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.modal h3{font-size:18px;font-weight:800;text-align:center;margin-bottom:14px}
+.modal h3{font-size:18px;font-weight:800;text-align:center;margin-bottom:8px}
+.modal .auto-suggest{text-align:center;font-size:13px;color:#22c55e;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.modal .auto-suggest button{background:#22c55e;color:#fff;border:none;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:700;cursor:pointer}
 .modal .display{background:#fff;border:2px solid #e5e5e5;border-radius:16px;padding:14px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:42px;letter-spacing:.2em;margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center;color:#111}
 .modal .display.empty{color:#ccc}
 .modal-actions{display:flex;flex-direction:column;gap:10px;margin-top:14px}
@@ -76,6 +80,14 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 .btn-modal.ready{background:#22c55e;color:#fff;flex:2}
 .btn-modal:disabled{opacity:.3;cursor:not-allowed}
 .btn-modal:active:not(:disabled){transform:scale(.98)}
+.confirm-modal{background:#fff;border-radius:24px;padding:24px;width:90%;max-width:400px;margin:auto}
+.confirm-modal h3{font-size:20px;font-weight:900;margin-bottom:12px;text-align:center}
+.confirm-modal p{color:#666;font-size:14px;margin-bottom:20px;text-align:center;line-height:1.5}
+.confirm-modal .buttons{display:flex;gap:10px}
+.confirm-modal .buttons button{flex:1;padding:16px;border-radius:14px;border:none;font-weight:800;font-size:15px;cursor:pointer}
+.confirm-modal .buttons .cancel{background:#f0f0f2;color:#111}
+.confirm-modal .buttons .danger{background:#ef4444;color:#fff}
+.modal-overlay.center{align-items:center}
 </style>
 </head>
 <body>
@@ -115,6 +127,7 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
   <div class="t-top">
     <h2>PASSE</h2>
     <span id="countReady">0 prete</span>
+    <button class="icon-btn" onclick="openResetConfirm()" title="Reset journee">&#x21BB;</button>
   </div>
   <div class="t-stats">
     <div class="stat"><b id="sEnCours">0</b><i>En cours</i></div>
@@ -135,10 +148,8 @@ let readyTimes = {};
 let currentCode = '';
 let savedCode = localStorage.getItem('hc_tablet_code') || '';
 let isOnline = false;
-let hasSyncedOnce = false;
+let lastNumber = parseInt(localStorage.getItem('hc_last_number') || '0', 10);
 
-/* ============ FILE D'ATTENTE ============ */
-// Chaque entree = { type: 'update-tickets', data: {...}, timestamp: Date.now() }
 let pendingQueue = JSON.parse(localStorage.getItem('hc_pending_queue') || '[]');
 
 function savePendingQueue() {
@@ -154,25 +165,21 @@ function enqueueUpdate(data) {
 function flushPendingQueue() {
   if (!isOnline || pendingQueue.length === 0) return;
   console.log('[PASSE] Envoi de ' + pendingQueue.length + ' element(s) en attente');
-  document.getElementById('connBadge').classList.add('show');
-  document.getElementById('connBadge').classList.add('syncing');
-  document.getElementById('connBadge').textContent = 'Synchronisation...';
-  
-  // Envoyer le dernier update (le plus recent = etat final)
-  // Mais pour etre sur, on envoie le ticket actuel complet
+  const badge = document.getElementById('connBadge');
+  badge.classList.add('show', 'syncing');
+  badge.textContent = 'Synchronisation...';
+
   socket.emit('tablet:update-tickets', { tickets });
-  
   pendingQueue = [];
   savePendingQueue();
   updatePendingBadge();
-  
+
   setTimeout(() => {
-    document.getElementById('connBadge').classList.remove('syncing');
-    document.getElementById('connBadge').classList.add('synced');
-    document.getElementById('connBadge').textContent = 'Synchronise';
+    badge.classList.remove('syncing');
+    badge.classList.add('synced');
+    badge.textContent = 'Synchronise';
     setTimeout(() => {
-      document.getElementById('connBadge').classList.remove('synced');
-      document.getElementById('connBadge').classList.remove('show');
+      badge.classList.remove('synced', 'show');
     }, 1500);
   }, 300);
 }
@@ -190,7 +197,6 @@ function updatePendingBadge() {
   }
 }
 
-/* ============ UI CODE ============ */
 function updateCodeDisplay() {
   const boxes = document.querySelectorAll('.code-box');
   boxes.forEach((b, i) => {
@@ -219,14 +225,11 @@ function tryConnect() {
   socket.emit('tablet:connect', { code: currentCode });
 }
 
-/* ============ CONNEXION ============ */
 socket.on('connect', () => {
   console.log('[PASSE] Connecte');
   isOnline = true;
   document.getElementById('connBadge').classList.remove('show');
-  if (savedCode) {
-    socket.emit('tablet:connect', { code: savedCode });
-  }
+  if (savedCode) socket.emit('tablet:connect', { code: savedCode });
 });
 
 socket.on('disconnect', () => {
@@ -242,31 +245,25 @@ socket.on('connect_error', () => {
   updatePendingBadge();
 });
 
-socket.on('tablet:connected', ({ tickets: t }) => {
+socket.on('tablet:connected', ({ tickets: t, lastNumber: ln }) => {
   savedCode = currentCode || savedCode;
   localStorage.setItem('hc_tablet_code', savedCode);
-  
-  // Si on se reconnecte et qu'on a des modifs en attente, on les garde
-  // Sinon on prend l'etat serveur
+
   if (pendingQueue.length === 0) {
     tickets = t || {};
-  } else {
-    // Fusionner : on garde nos modifs locales
-    const serverTickets = t || {};
-    // On garde nos tickets locaux s'ils sont plus recents
-    // (pour l'instant, on garde nos modifs locales)
+    if (ln !== undefined && ln > lastNumber) {
+      lastNumber = ln;
+      localStorage.setItem('hc_last_number', String(lastNumber));
+    }
   }
-  
+
   socket.emit('tablet:request-ready-times');
   document.getElementById('pairingView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
   updateStatus(true);
   render();
-  
-  // Envoyer tout ce qui est en attente
-  if (pendingQueue.length > 0) {
-    flushPendingQueue();
-  }
+
+  if (pendingQueue.length > 0) flushPendingQueue();
 });
 
 socket.on('tablet:ready-times', (rt) => {
@@ -283,6 +280,15 @@ socket.on('tablet:error', (msg) => {
     updateCodeDisplay();
     vibrate([50, 30, 50]);
   }
+});
+
+socket.on('tablet:day-reset', () => {
+  tickets = {};
+  readyTimes = {};
+  lastNumber = 0;
+  localStorage.setItem('hc_last_number', '0');
+  render();
+  showToast('Journee reinitialisee');
 });
 
 function updateStatus(online) {
@@ -302,11 +308,14 @@ function vibrate(pattern) {
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
 }
 
-/* ============ MODALE ============ */
+/* ============ MODALE AJOUT ============ */
 let modalCode = '';
 
 function openAddModal() {
-  modalCode = '';
+  // Pre-remplir avec le prochain numero
+  modalCode = String(lastNumber + 1);
+  const suggested = lastNumber + 1;
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.id = 'modalOverlay';
@@ -317,12 +326,13 @@ function openAddModal() {
   numpadHTML += '<button type="button" data-action="back">X</button>';
   overlay.innerHTML = '<div class="modal">' +
     '<h3>Numero du ticket</h3>' +
-    '<div class="display empty" id="modalDisplay">----</div>' +
+    '<div class="auto-suggest">Suggestion auto : #' + suggested + ' <button type="button" id="autoSuggest">Reprendre</button></div>' +
+    '<div class="display" id="modalDisplay">' + modalCode + '</div>' +
     '<div class="numpad" id="modalNumpad">' + numpadHTML + '</div>' +
     '<div class="modal-actions"><div class="row">' +
       '<button type="button" id="modalCancel" class="btn-modal cancel">Annuler</button>' +
-      '<button type="button" id="modalAddPrep" class="btn-modal prep" disabled>En cours</button>' +
-      '<button type="button" id="modalAddReady" class="btn-modal ready" disabled>AJOUTER PRET</button>' +
+      '<button type="button" id="modalAddPrep" class="btn-modal prep">En cours</button>' +
+      '<button type="button" id="modalAddReady" class="btn-modal ready">AJOUTER PRET</button>' +
     '</div></div></div>';
   document.body.appendChild(overlay);
   document.querySelectorAll('#modalNumpad button').forEach(btn => {
@@ -337,6 +347,11 @@ function openAddModal() {
   document.getElementById('modalCancel').addEventListener('click', closeAddModal);
   document.getElementById('modalAddPrep').addEventListener('click', () => confirmAddModal('prep'));
   document.getElementById('modalAddReady').addEventListener('click', () => confirmAddModal('ready'));
+  document.getElementById('autoSuggest').addEventListener('click', () => {
+    modalCode = String(suggested);
+    updateModalDisplay();
+    vibrate(10);
+  });
   updateModalDisplay();
 }
 
@@ -360,13 +375,55 @@ function confirmAddModal(status) {
   const n = parseInt(modalCode, 10);
   if (!n || tickets[n]) { alert('Numero invalide ou deja existant'); modalClear(); return; }
   tickets[n] = status;
+  if (n > lastNumber) {
+    lastNumber = n;
+    localStorage.setItem('hc_last_number', String(lastNumber));
+  }
   syncTickets();
   render();
   closeAddModal();
   if (status === 'ready') beep();
 }
 
-/* ============ SYNCHRO ============ */
+/* ============ RESET JOURNEE ============ */
+function openResetConfirm() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay center';
+  overlay.id = 'resetOverlay';
+  overlay.innerHTML = '<div class="confirm-modal">' +
+    '<h3>Reinitialiser la journee ?</h3>' +
+    '<p>Tous les tickets en cours et prets seront supprimes. Cette action est irreversible.</p>' +
+    '<div class="buttons">' +
+      '<button type="button" class="cancel" id="resetCancel">Annuler</button>' +
+      '<button type="button" class="danger" id="resetConfirm">Reinitialiser</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  document.getElementById('resetCancel').addEventListener('click', () => overlay.remove());
+  document.getElementById('resetConfirm').addEventListener('click', () => {
+    overlay.remove();
+    // Reset local
+    tickets = {};
+    readyTimes = {};
+    lastNumber = 0;
+    localStorage.setItem('hc_last_number', '0');
+    pendingQueue = [];
+    savePendingQueue();
+    render();
+    // Envoyer au serveur
+    socket.emit('tablet:reset-day');
+    showToast('Journee reinitialisee');
+  });
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:12px 20px;border-radius:99px;font-size:14px;font-weight:700;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,.2)';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
 function syncTickets() {
   if (isOnline && socket.connected) {
     socket.emit('tablet:update-tickets', { tickets });

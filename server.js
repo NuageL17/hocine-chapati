@@ -14,13 +14,14 @@ const STATE_FILE = path.join(DATA_DIR, 'state.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-// Forcer l'encodage UTF-8 sur les pages HTML
+// Forcer l'UTF-8 sur les pages HTML
 app.use((req, res, next) => {
   if (req.path.endsWith('.html') || req.path === '/' || !req.path.includes('.')) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
   }
   next();
 });
+
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/affichage', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affichage.html')));
 app.get('/passe', (req, res) => res.sendFile(path.join(__dirname, 'public', 'passe.html')));
@@ -29,6 +30,7 @@ let state = {
   code: null,
   tickets: {},
   readyTimes: {},
+  lastNumber: 0,
   tvs: new Set(),
   tablets: new Set()
 };
@@ -44,6 +46,7 @@ function loadState() {
       state.code = data.code || generateCode();
       state.tickets = data.tickets || {};
       state.readyTimes = data.readyTimes || {};
+      state.lastNumber = data.lastNumber || 0;
     } else {
       state.code = generateCode();
     }
@@ -58,7 +61,8 @@ function saveState() {
     fs.writeFileSync(STATE_FILE, JSON.stringify({
       code: state.code,
       tickets: state.tickets,
-      readyTimes: state.readyTimes
+      readyTimes: state.readyTimes,
+      lastNumber: state.lastNumber
     }, null, 2));
   } catch (e) { console.error('Erreur sauvegarde state:', e); }
 }
@@ -72,7 +76,7 @@ io.on('connection', (socket) => {
     socket.emit('tv:registered', { code: state.code });
     socket.emit('tv:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
     if (state.tablets.size > 0) socket.emit('tv:tablet-connected');
-    console.log(`TV connectée (total: ${state.tvs.size})`);
+    console.log('TV connectee (total: ' + state.tvs.size + ')');
   });
 
   socket.on('tablet:connect', ({ code }) => {
@@ -81,14 +85,12 @@ io.on('connection', (socket) => {
     }
     state.tablets.add(socket.id);
     socket.role = 'tablet';
-    socket.emit('tablet:connected', { tickets: state.tickets });
-    // Envoyer les readyTimes à la tablette aussi
+    socket.emit('tablet:connected', { tickets: state.tickets, lastNumber: state.lastNumber });
     socket.emit('tablet:ready-times', state.readyTimes);
     state.tvs.forEach(id => io.to(id).emit('tv:tablet-connected'));
-    console.log(`Tablette connectée (total: ${state.tablets.size})`);
+    console.log('Tablette connectee (total: ' + state.tablets.size + ')');
   });
 
-  // La tablette peut demander les readyTimes à tout moment
   socket.on('tablet:request-ready-times', () => {
     socket.emit('tablet:ready-times', state.readyTimes);
   });
@@ -109,16 +111,20 @@ io.on('connection', (socket) => {
       }
     });
 
+    // Mettre a jour lastNumber si un ticket est plus grand
+    Object.keys(tickets).forEach(num => {
+      const n = parseInt(num, 10);
+      if (!isNaN(n) && n > state.lastNumber) state.lastNumber = n;
+    });
+
     state.tickets = tickets;
     state.readyTimes = newReadyTimes;
 
-    // Broadcast à toutes les TVs
     state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', {
       tickets: state.tickets,
       readyTimes: state.readyTimes
     }));
 
-    // Broadcast aux autres tablettes
     state.tablets.forEach(id => {
       if (id !== socket.id) {
         io.to(id).emit('tablet:ready-times', state.readyTimes);
@@ -126,6 +132,26 @@ io.on('connection', (socket) => {
     });
 
     saveState();
+  });
+
+  // Reset de la journee
+  socket.on('tablet:reset-day', () => {
+    if (socket.role !== 'tablet') return;
+    state.tickets = {};
+    state.readyTimes = {};
+    state.lastNumber = 0;
+
+    state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', {
+      tickets: {},
+      readyTimes: {}
+    }));
+
+    state.tablets.forEach(id => {
+      io.to(id).emit('tablet:day-reset');
+    });
+
+    saveState();
+    console.log('Journee reinitialisee par ' + socket.id);
   });
 
   socket.on('tv:request-state', () => {
@@ -136,17 +162,17 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     if (socket.role === 'tv') {
       state.tvs.delete(socket.id);
-      console.log(`TV déconnectée (total: ${state.tvs.size})`);
+      console.log('TV deconnectee (total: ' + state.tvs.size + ')');
     } else if (socket.role === 'tablet') {
       state.tablets.delete(socket.id);
       state.tvs.forEach(id => io.to(id).emit('tv:tablet-disconnected'));
-      console.log(`Tablette déconnectée (total: ${state.tablets.size})`);
+      console.log('Tablette deconnectee (total: ' + state.tablets.size + ')');
     }
   });
 });
 
 loadState();
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Serveur démarré sur http://0.0.0.0:${PORT}`);
-  console.log(`🔑 Code d'appairage : ${state.code}`);
+  console.log('Serveur demarre sur http://0.0.0.0:' + PORT);
+  console.log('Code appairage : ' + state.code);
 });
