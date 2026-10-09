@@ -22,16 +22,13 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] })
 app.get('/affichage', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affichage.html')));
 app.get('/passe', (req, res) => res.sendFile(path.join(__dirname, 'public', 'passe.html')));
 
-// ============================================================
-// MONGODB MODELS
-// ============================================================
 const TicketSchema = new mongoose.Schema({
   num: { type: Number, required: true, index: true },
   status: { type: String, enum: ['prep', 'ready'], default: 'prep' },
   created: Date,
   ready: Date,
   retrieved: Date,
-  day: { type: String, index: true }  // format YYYY-MM-DD
+  day: { type: String, index: true }
 }, { timestamps: true });
 
 const Ticket = mongoose.model('Ticket', TicketSchema);
@@ -43,9 +40,6 @@ const ConfigSchema = new mongoose.Schema({
 
 const Config = mongoose.model('Config', ConfigSchema);
 
-// ============================================================
-// ETAT EN MEMOIRE (source de verite pour le temps reel)
-// ============================================================
 let state = {
   code: null,
   tickets: {},
@@ -65,19 +59,14 @@ function todayKey() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-// ============================================================
-// PERSISTANCE MONGODB
-// ============================================================
 async function loadStateFromDB() {
   try {
-    // Charger le code d'appairage
     let codeDoc = await Config.findOne({ key: 'pairing_code' });
     if (!codeDoc) {
       codeDoc = await Config.create({ key: 'pairing_code', value: generateCode() });
     }
     state.code = codeDoc.value;
 
-    // Charger les tickets en cours (non recuperes)
     const activeTickets = await Ticket.find({ retrieved: null });
     activeTickets.forEach(t => {
       state.tickets[t.num] = t.status;
@@ -86,11 +75,8 @@ async function loadStateFromDB() {
       if (t.num > state.lastNumber) state.lastNumber = t.num;
     });
 
-    // Charger le lastNumber global
     const lastNumDoc = await Config.findOne({ key: 'last_number' });
-    if (lastNumDoc) {
-      state.lastNumber = Math.max(state.lastNumber, lastNumDoc.value);
-    }
+    if (lastNumDoc) state.lastNumber = Math.max(state.lastNumber, lastNumDoc.value);
 
     console.log('[DB] Etat charge: ' + activeTickets.length + ' tickets actifs, code=' + state.code);
   } catch (e) {
@@ -99,27 +85,12 @@ async function loadStateFromDB() {
   }
 }
 
-async function savePairingCode() {
-  try {
-    await Config.findOneAndUpdate(
-      { key: 'pairing_code' },
-      { value: state.code },
-      { upsert: true }
-    );
-  } catch (e) { console.error('[DB] Erreur savePairingCode:', e); }
-}
-
 async function saveLastNumber() {
   try {
-    await Config.findOneAndUpdate(
-      { key: 'last_number' },
-      { value: state.lastNumber },
-      { upsert: true }
-    );
+    await Config.findOneAndUpdate({ key: 'last_number' }, { value: state.lastNumber }, { upsert: true });
   } catch (e) { console.error('[DB] Erreur saveLastNumber:', e); }
 }
 
-// Cree ou met a jour un ticket en BDD
 async function upsertTicket(num, status, createdTs, readyTs) {
   try {
     const update = { status, day: todayKey() };
@@ -133,7 +104,6 @@ async function upsertTicket(num, status, createdTs, readyTs) {
   } catch (e) { console.error('[DB] Erreur upsertTicket:', e); }
 }
 
-// Marque un ticket comme recupere
 async function markRetrieved(num, retrievedTs) {
   try {
     await Ticket.findOneAndUpdate(
@@ -143,9 +113,6 @@ async function markRetrieved(num, retrievedTs) {
   } catch (e) { console.error('[DB] Erreur markRetrieved:', e); }
 }
 
-// ============================================================
-// SOCKET.IO
-// ============================================================
 io.on('connection', (socket) => {
   console.log('Connexion:', socket.id);
 
@@ -155,19 +122,15 @@ io.on('connection', (socket) => {
     socket.emit('tv:registered', { code: state.code });
     socket.emit('tv:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
     if (state.tablets.size > 0) socket.emit('tv:tablet-connected');
-    console.log('TV connectee (total: ' + state.tvs.size + ')');
   });
 
   socket.on('tablet:connect', ({ code }) => {
-    if (String(code) !== String(state.code)) {
-      return socket.emit('tablet:error', 'Code incorrect');
-    }
+    if (String(code) !== String(state.code)) return socket.emit('tablet:error', 'Code incorrect');
     state.tablets.add(socket.id);
     socket.role = 'tablet';
     socket.emit('tablet:connected', { tickets: state.tickets, lastNumber: state.lastNumber });
     socket.emit('tablet:ready-times', state.readyTimes);
     state.tvs.forEach(id => io.to(id).emit('tv:tablet-connected'));
-    console.log('Tablette connectee (total: ' + state.tablets.size + ')');
   });
 
   socket.on('tablet:request-ready-times', () => {
@@ -182,48 +145,32 @@ io.on('connection', (socket) => {
     if (socket.role !== 'tablet') return;
     const now = Date.now();
     const prevTickets = state.tickets;
-
     const newReadyTimes = {};
     const newCreatedTimes = {};
 
     Object.keys(tickets).forEach(num => {
-      if (prevTickets[num] === undefined) {
-        newCreatedTimes[num] = now;
-      } else if (state.createdTimes[num]) {
-        newCreatedTimes[num] = state.createdTimes[num];
-      } else {
-        newCreatedTimes[num] = now;
-      }
+      if (prevTickets[num] === undefined) newCreatedTimes[num] = now;
+      else if (state.createdTimes[num]) newCreatedTimes[num] = state.createdTimes[num];
+      else newCreatedTimes[num] = now;
 
       if (tickets[num] === 'ready') {
-        if (prevTickets[num] === 'ready' && state.readyTimes[num]) {
-          newReadyTimes[num] = state.readyTimes[num];
-        } else {
-          newReadyTimes[num] = now;
-        }
+        if (prevTickets[num] === 'ready' && state.readyTimes[num]) newReadyTimes[num] = state.readyTimes[num];
+        else newReadyTimes[num] = now;
       }
     });
 
-    // Detecter les tickets recuperes (supprimes) -> BDD
     for (const num of Object.keys(prevTickets)) {
-      if (tickets[num] === undefined) {
-        await markRetrieved(parseInt(num, 10), now);
-      }
+      if (tickets[num] === undefined) await markRetrieved(parseInt(num, 10), now);
     }
 
-    // Detecter les nouveaux tickets et changements de statut -> BDD
     for (const num of Object.keys(tickets)) {
       const n = parseInt(num, 10);
       const wasExisting = prevTickets[num] !== undefined;
       const statusChanged = prevTickets[num] !== tickets[num];
-
       if (!wasExisting || statusChanged) {
         await upsertTicket(n, tickets[num], newCreatedTimes[num], newReadyTimes[num]);
       }
-
-      if (n > state.lastNumber) {
-        state.lastNumber = n;
-      }
+      if (n > state.lastNumber) state.lastNumber = n;
     }
 
     if (state.lastNumber > 0) await saveLastNumber();
@@ -232,42 +179,17 @@ io.on('connection', (socket) => {
     state.readyTimes = newReadyTimes;
     state.createdTimes = newCreatedTimes;
 
-    state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', {
-      tickets: state.tickets,
-      readyTimes: state.readyTimes
-    }));
-
-    state.tablets.forEach(id => {
-      if (id !== socket.id) {
-        io.to(id).emit('tablet:ready-times', state.readyTimes);
-      }
-    });
+    state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes }));
+    state.tablets.forEach(id => { if (id !== socket.id) io.to(id).emit('tablet:ready-times', state.readyTimes); });
   });
 
   socket.on('tablet:reset-day', async () => {
     if (socket.role !== 'tablet') return;
-    state.tickets = {};
-    state.readyTimes = {};
-    state.createdTimes = {};
-    state.lastNumber = 0;
-
-    // Supprimer tous les tickets non-recuperes en BDD
-    try {
-      await Ticket.deleteMany({ retrieved: null });
-    } catch (e) { console.error('[DB] Erreur reset:', e); }
-
+    state.tickets = {}; state.readyTimes = {}; state.createdTimes = {}; state.lastNumber = 0;
+    try { await Ticket.deleteMany({ retrieved: null }); } catch (e) { console.error(e); }
     await saveLastNumber();
-
-    state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', {
-      tickets: {},
-      readyTimes: {}
-    }));
-
-    state.tablets.forEach(id => {
-      io.to(id).emit('tablet:day-reset');
-    });
-
-    console.log('Journee reinitialisee');
+    state.tvs.forEach(id => io.to(id).emit('tv:tickets-updated', { tickets: {}, readyTimes: {} }));
+    state.tablets.forEach(id => io.to(id).emit('tablet:day-reset'));
   });
 
   socket.on('tv:request-state', () => {
@@ -276,37 +198,26 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (socket.role === 'tv') {
-      state.tvs.delete(socket.id);
-      console.log('TV deconnectee (total: ' + state.tvs.size + ')');
-    } else if (socket.role === 'tablet') {
+    if (socket.role === 'tv') state.tvs.delete(socket.id);
+    else if (socket.role === 'tablet') {
       state.tablets.delete(socket.id);
       state.tvs.forEach(id => io.to(id).emit('tv:tablet-disconnected'));
-      console.log('Tablette deconnectee (total: ' + state.tablets.size + ')');
     }
   });
 });
 
-// ============================================================
-// STATS depuis MongoDB
-// ============================================================
 async function getStats() {
   try {
     const day = todayKey();
-
     const served = await Ticket.find({ day, retrieved: { $ne: null } }).sort({ retrieved: 1 });
     const totalServed = served.length;
-
     const prepDurations = served.filter(t => t.created && t.ready).map(t => t.ready.getTime() - t.created.getTime());
     const avgPrep = prepDurations.length > 0 ? Math.round(prepDurations.reduce((a, b) => a + b, 0) / prepDurations.length) : 0;
-
     const waitDurations = served.filter(t => t.ready && t.retrieved).map(t => t.retrieved.getTime() - t.ready.getTime());
     const avgWait = waitDurations.length > 0 ? Math.round(waitDurations.reduce((a, b) => a + b, 0) / waitDurations.length) : 0;
-
     const createdTimes = served.filter(t => t.created).map(t => t.created.getTime());
     const firstOrder = createdTimes.length > 0 ? Math.min(...createdTimes) : null;
     const lastOrder = createdTimes.length > 0 ? Math.max(...createdTimes) : null;
-
     const byHour = {};
     served.forEach(t => {
       if (t.created) {
@@ -314,45 +225,33 @@ async function getStats() {
         byHour[key] = (byHour[key] || 0) + 1;
       }
     });
-
     const recent = served.slice(-20).reverse().map(t => ({
       num: t.num,
       created: t.created ? t.created.getTime() : null,
       ready: t.ready ? t.ready.getTime() : null,
       retrieved: t.retrieved ? t.retrieved.getTime() : null
     }));
-
     const inProgress = Object.keys(state.tickets).filter(k => state.tickets[k] === 'prep').length;
     const readyNow = Object.keys(state.tickets).filter(k => state.tickets[k] === 'ready').length;
-
-    return {
-      totalServed, inProgress, readyNow,
-      avgPrep, avgWait,
-      firstOrder, lastOrder,
-      byHour, recent,
-      now: Date.now()
-    };
+    return { totalServed, inProgress, readyNow, avgPrep, avgWait, firstOrder, lastOrder, byHour, recent, now: Date.now() };
   } catch (e) {
     console.error('[DB] Erreur getStats:', e);
     return { totalServed: 0, inProgress: 0, readyNow: 0, avgPrep: 0, avgWait: 0, firstOrder: null, lastOrder: null, byHour: {}, recent: [], now: Date.now() };
   }
 }
 
-// ============================================================
-// DEMARRAGE
-// ============================================================
 async function start() {
   if (!MONGO_URL) {
-    console.error('ERREUR: MONGO_URL manquant');
+    console.error('ERREUR: MONGO_URL manquant - verifie les Environment Variables sur Render');
     process.exit(1);
   }
   try {
+    console.log('Tentative de connexion a MongoDB...');
     await mongoose.connect(MONGO_URL);
     console.log('Connecte a MongoDB');
     await loadStateFromDB();
-    await savePairingCode();
   } catch (e) {
-    console.error('Erreur MongoDB:', e);
+    console.error('Erreur MongoDB:', e.message);
     process.exit(1);
   }
 
