@@ -254,6 +254,58 @@ io.on('connection', (socket) => {
     if (socket.role !== 'caisse') return;
     socket.emit('caisse:tickets-updated', { tickets: state.tickets, readyTimes: state.readyTimes });
   });
+  socket.on('caisse:request-report', async () => {
+    try {
+      const day = todayKey();
+      const allDay = await Ticket.find({ day }).sort({ num: 1 });
+      const served = allDay.filter(t => t.retrieved);
+      const pending = allDay.filter(t => !t.retrieved);
+
+      const prepDurations = served.filter(t => t.created && t.ready).map(t => t.ready.getTime() - t.created.getTime());
+      const avgPrep = prepDurations.length > 0 ? Math.round(prepDurations.reduce((a, b) => a + b, 0) / prepDurations.length) : 0;
+
+      const waitDurations = served.filter(t => t.ready && t.retrieved).map(t => t.retrieved.getTime() - t.ready.getTime());
+      const avgWait = waitDurations.length > 0 ? Math.round(waitDurations.reduce((a, b) => a + b, 0) / waitDurations.length) : 0;
+
+      const byHour = {};
+      served.forEach(t => {
+        if (t.created) {
+          const key = String(t.created.getHours()).padStart(2, '0') + 'h';
+          byHour[key] = (byHour[key] || 0) + 1;
+        }
+      });
+
+      const ticketsList = allDay.map(t => ({
+        num: t.num,
+        status: t.retrieved ? 'served' : (t.ready ? 'ready' : 'prep'),
+        created: t.created ? t.created.getTime() : null,
+        ready: t.ready ? t.ready.getTime() : null,
+        retrieved: t.retrieved ? t.retrieved.getTime() : null,
+        prepMs: (t.created && t.ready) ? t.ready.getTime() - t.created.getTime() : null,
+        waitMs: (t.ready && t.retrieved) ? t.retrieved.getTime() - t.ready.getTime() : null
+      }));
+
+      const firstOrder = served.length > 0 ? Math.min(...served.filter(t => t.created).map(t => t.created.getTime())) : null;
+      const lastOrder = served.length > 0 ? Math.max(...served.filter(t => t.retrieved).map(t => t.retrieved.getTime())) : null;
+
+      socket.emit('caisse:report', {
+        day,
+        now: Date.now(),
+        totalDay: allDay.length,
+        totalServed: served.length,
+        totalPending: pending.length,
+        avgPrep,
+        avgWait,
+        firstOrder,
+        lastOrder,
+        byHour,
+        ticketsList
+      });
+    } catch (e) {
+      console.error('[REPORT] Erreur:', e);
+      socket.emit('caisse:report', { error: e.message });
+    }
+  });
   socket.on('disconnect', () => {
     if (socket.role === 'tv') state.tvs.delete(socket.id);
     else if (socket.role === 'tablet') {

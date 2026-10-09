@@ -120,6 +120,7 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
     <h1>HOCINE CHAPATI - CAISSE</h1>
     <div class="top-right">
       <span class="status" id="status">●</span>
+      <button onclick="requestReport()" style="background:#f59e0b">📊 Ticket Z</button>
       <button onclick="testPrint()">Test imprimante</button>
       <button class="green" onclick="printAll()">🖨 Tout imprimer</button>
       <button onclick="logout()">Deconnexion</button>
@@ -312,6 +313,115 @@ function testPrint() {
   '</div>';
   setTimeout(() => window.print(), 100);
 }
+
+/* === TICKET Z (RAPPORT DE CLOTURE) === */
+socket.on('caisse:report', (report) => {
+  if (report.error) { showToast('Erreur: ' + report.error, true); return; }
+  buildAndPrintReport(report);
+});
+
+function requestReport() {
+  socket.emit('caisse:request-report');
+  showToast('Preparation du ticket Z...');
+}
+
+function padZ(n) { return String(n).padStart(2, '0'); }
+function fmtHour(ts) {
+  if (!ts) return '--:--';
+  const d = new Date(ts);
+  return padZ(d.getHours()) + ':' + padZ(d.getMinutes());
+}
+function fmtHourSec(ts) {
+  if (!ts) return '--:--:--';
+  const d = new Date(ts);
+  return padZ(d.getHours()) + ':' + padZ(d.getMinutes()) + ':' + padZ(d.getSeconds());
+}
+function fmtDuree(ms) {
+  if (!ms || ms < 0) return '--';
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  if (m >= 60) { const h = Math.floor(m / 60); return h + 'h ' + padZ(m % 60) + 'm'; }
+  return m + 'm ' + padZ(sec) + 's';
+}
+
+function buildAndPrintReport(r) {
+  const dateNow = new Date(r.now);
+  const dateStr = padZ(dateNow.getDate()) + '/' + padZ(dateNow.getMonth() + 1) + '/' + dateNow.getFullYear();
+  const heureStr = padZ(dateNow.getHours()) + ':' + padZ(dateNow.getMinutes()) + ':' + padZ(dateNow.getSeconds());
+
+  // Heures
+  const hours = Object.keys(r.byHour).sort();
+  let histoHTML = '';
+  if (hours.length === 0) {
+    histoHTML = '<div class="report-line"><span>Aucune commande</span><span></span></div>';
+  } else {
+    histoHTML = hours.map(h => 
+      '<div class="report-line"><span>' + h + '</span><span>' + r.byHour[h] + '</span></div>'
+    ).join('');
+  }
+
+  // Liste des tickets
+  let ticketsHTML = '';
+  if (r.ticketsList.length === 0) {
+    ticketsHTML = '<div class="report-line"><span>Aucun ticket</span><span></span></div>';
+  } else {
+    ticketsHTML = r.ticketsList.map(t => {
+      const statusStr = t.status === 'served' ? 'OK' : (t.status === 'ready' ? 'PRET' : 'EN COURS');
+      const timeRange = fmtHour(t.created) + ' > ' + (t.retrieved ? fmtHour(t.retrieved) : (t.ready ? fmtHour(t.ready) : '--'));
+      const dur = t.waitMs !== null && t.waitMs !== undefined ? fmtDuree(t.waitMs) : (t.prepMs !== null ? fmtDuree(t.prepMs) : '--');
+      return '<div class="report-ticket-row">' +
+        '<span class="num">#' + t.num + '</span>' +
+        '<span class="range">' + timeRange + '</span>' +
+        '<span class="dur">' + dur + '</span>' +
+        '<span class="status">' + statusStr + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  const html = '<div class="report-z">' +
+    '<div class="header">' +
+      '<div class="shop">HOCINE CHAPATI</div>' +
+      '<div class="title">RAPPORT DE CLOTURE</div>' +
+      '<div class="subtitle">TICKET Z</div>' +
+    '</div>' +
+    '<div class="sep-double"></div>' +
+    '<div class="report-line"><span>Date</span><span>' + dateStr + '</span></div>' +
+    '<div class="report-line"><span>Heure du rapport</span><span>' + heureStr + '</span></div>' +
+    '<div class="sep"></div>' +
+    '<div class="section-title">RESUME</div>' +
+    '<div class="report-line big"><span>Total tickets emis</span><span>' + r.totalDay + '</span></div>' +
+    '<div class="report-line big"><span>Tickets servis</span><span>' + r.totalServed + '</span></div>' +
+    '<div class="report-line big"><span>Tickets en attente</span><span>' + r.totalPending + '</span></div>' +
+    '<div class="sep"></div>' +
+    '<div class="section-title">TEMPS MOYENS</div>' +
+    '<div class="report-line"><span>Preparation moy.</span><span>' + fmtDuree(r.avgPrep) + '</span></div>' +
+    '<div class="report-line"><span>Attente client moy.</span><span>' + fmtDuree(r.avgWait) + '</span></div>' +
+    '<div class="sep"></div>' +
+    '<div class="section-title">ACTIVITE</div>' +
+    '<div class="report-line"><span>1ere commande</span><span>' + fmtHourSec(r.firstOrder) + '</span></div>' +
+    '<div class="report-line"><span>Derniere commande</span><span>' + fmtHourSec(r.lastOrder) + '</span></div>' +
+    '<div class="sep"></div>' +
+    '<div class="section-title">REPARTITION PAR HEURE</div>' +
+    histoHTML +
+    '<div class="sep"></div>' +
+    '<div class="section-title">DETAIL DES TICKETS (' + r.ticketsList.length + ')</div>' +
+    '<div class="report-ticket-header">' +
+      '<span class="num">N°</span>' +
+      '<span class="range">Cree > Servi</span>' +
+      '<span class="dur">Temps</span>' +
+      '<span class="status">Etat</span>' +
+    '</div>' +
+    ticketsHTML +
+    '<div class="sep-double"></div>' +
+    '<div class="footer">*** FIN DU RAPPORT ***</div>' +
+    '<div class="footer-small">Imprime automatiquement</div>' +
+  '</div>';
+
+  document.getElementById('printZone').innerHTML = html;
+  setTimeout(() => window.print(), 150);
+}
+
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
   t.textContent = msg;
