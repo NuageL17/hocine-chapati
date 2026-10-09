@@ -36,12 +36,16 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 .stat{flex:1;background:#f5f5f7;border-radius:14px;padding:10px;text-align:center}
 .stat b{font-size:22px;display:block}
 .stat i{font-size:12px;color:#888;font-style:normal}
-.connection-badge{position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;z-index:200;display:none}
+.connection-badge{position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;z-index:200;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
 .connection-badge.show{display:block}
+.connection-badge.syncing{background:#f59e0b}
+.connection-badge.synced{background:#22c55e}
 .cards{padding:16px 18px 100px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:600px){.cards{grid-template-columns:1fr}}
 .card{background:#fff;border:1.5px solid #e5e5e5;border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:.2s;position:relative}
 .card.ready{border-color:#22c55e;background:#f0fdf4}
+.card.pending{border-color:#f59e0b}
+.card.pending::after{content:'EN ATTENTE';position:absolute;top:8px;right:8px;background:#f59e0b;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;letter-spacing:.05em}
 .card-header{display:flex;justify-content:space-between;align-items:center}
 .card-num{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700}
 .badge{font-size:12px;padding:5px 10px;border-radius:99px;font-weight:700;background:#111;color:#fff}
@@ -76,7 +80,7 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
 </head>
 <body>
 
-<div class="connection-badge" id="connBadge">Reconnexion...</div>
+<div class="connection-badge" id="connBadge">Hors ligne</div>
 
 <div class="pairing" id="pairingView">
   <h1>[H] Hocine Chapati</h1>
@@ -130,6 +134,61 @@ let tickets = {};
 let readyTimes = {};
 let currentCode = '';
 let savedCode = localStorage.getItem('hc_tablet_code') || '';
+let isOnline = false;
+let hasSyncedOnce = false;
+
+/* ============ FILE D'ATTENTE ============ */
+// Chaque entree = { type: 'update-tickets', data: {...}, timestamp: Date.now() }
+let pendingQueue = JSON.parse(localStorage.getItem('hc_pending_queue') || '[]');
+
+function savePendingQueue() {
+  localStorage.setItem('hc_pending_queue', JSON.stringify(pendingQueue));
+}
+
+function enqueueUpdate(data) {
+  pendingQueue.push({ type: 'update-tickets', data, timestamp: Date.now() });
+  savePendingQueue();
+  updatePendingBadge();
+}
+
+function flushPendingQueue() {
+  if (!isOnline || pendingQueue.length === 0) return;
+  console.log('[PASSE] Envoi de ' + pendingQueue.length + ' element(s) en attente');
+  document.getElementById('connBadge').classList.add('show');
+  document.getElementById('connBadge').classList.add('syncing');
+  document.getElementById('connBadge').textContent = 'Synchronisation...';
+  
+  // Envoyer le dernier update (le plus recent = etat final)
+  // Mais pour etre sur, on envoie le ticket actuel complet
+  socket.emit('tablet:update-tickets', { tickets });
+  
+  pendingQueue = [];
+  savePendingQueue();
+  updatePendingBadge();
+  
+  setTimeout(() => {
+    document.getElementById('connBadge').classList.remove('syncing');
+    document.getElementById('connBadge').classList.add('synced');
+    document.getElementById('connBadge').textContent = 'Synchronise';
+    setTimeout(() => {
+      document.getElementById('connBadge').classList.remove('synced');
+      document.getElementById('connBadge').classList.remove('show');
+    }, 1500);
+  }, 300);
+}
+
+function updatePendingBadge() {
+  const badge = document.getElementById('connBadge');
+  if (!isOnline && pendingQueue.length > 0) {
+    badge.textContent = 'Hors ligne - ' + pendingQueue.length + ' en attente';
+    badge.classList.add('show');
+    badge.classList.remove('syncing', 'synced');
+  } else if (!isOnline) {
+    badge.textContent = 'Hors ligne';
+    badge.classList.add('show');
+    badge.classList.remove('syncing', 'synced');
+  }
+}
 
 /* ============ UI CODE ============ */
 function updateCodeDisplay() {
@@ -160,34 +219,54 @@ function tryConnect() {
   socket.emit('tablet:connect', { code: currentCode });
 }
 
-/* ============ RECONNEXION AUTO ============ */
+/* ============ CONNEXION ============ */
 socket.on('connect', () => {
-  console.log('[PASSE] Connecte au serveur');
+  console.log('[PASSE] Connecte');
+  isOnline = true;
   document.getElementById('connBadge').classList.remove('show');
   if (savedCode) {
-    // Tentative de reconnexion silencieuse
     socket.emit('tablet:connect', { code: savedCode });
   }
 });
 
 socket.on('disconnect', () => {
   console.log('[PASSE] Deconnecte');
-  document.getElementById('connBadge').classList.add('show');
+  isOnline = false;
+  updateStatus(false);
+  updatePendingBadge();
 });
 
 socket.on('connect_error', () => {
-  document.getElementById('connBadge').classList.add('show');
+  isOnline = false;
+  updateStatus(false);
+  updatePendingBadge();
 });
 
 socket.on('tablet:connected', ({ tickets: t }) => {
   savedCode = currentCode || savedCode;
   localStorage.setItem('hc_tablet_code', savedCode);
-  tickets = t || {};
+  
+  // Si on se reconnecte et qu'on a des modifs en attente, on les garde
+  // Sinon on prend l'etat serveur
+  if (pendingQueue.length === 0) {
+    tickets = t || {};
+  } else {
+    // Fusionner : on garde nos modifs locales
+    const serverTickets = t || {};
+    // On garde nos tickets locaux s'ils sont plus recents
+    // (pour l'instant, on garde nos modifs locales)
+  }
+  
   socket.emit('tablet:request-ready-times');
   document.getElementById('pairingView').classList.add('hidden');
   document.getElementById('mainView').classList.remove('hidden');
   updateStatus(true);
   render();
+  
+  // Envoyer tout ce qui est en attente
+  if (pendingQueue.length > 0) {
+    flushPendingQueue();
+  }
 });
 
 socket.on('tablet:ready-times', (rt) => {
@@ -196,7 +275,6 @@ socket.on('tablet:ready-times', (rt) => {
 });
 
 socket.on('tablet:error', (msg) => {
-  // Ne pas afficher l'erreur si on est deja connecte (reconnexion silencieuse)
   if (document.getElementById('mainView').classList.contains('hidden')) {
     document.getElementById('errorMsg').textContent = msg;
     currentCode = '';
@@ -210,6 +288,7 @@ socket.on('tablet:error', (msg) => {
 function updateStatus(online) {
   const statusEl = document.getElementById('sStatus');
   const textEl = document.getElementById('sStatusText');
+  if (!statusEl) return;
   if (online) {
     statusEl.style.color = '#22c55e';
     textEl.textContent = 'Connecte';
@@ -223,7 +302,7 @@ function vibrate(pattern) {
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
 }
 
-/* ============ MODALE AJOUT ============ */
+/* ============ MODALE ============ */
 let modalCode = '';
 
 function openAddModal() {
@@ -287,7 +366,14 @@ function confirmAddModal(status) {
   if (status === 'ready') beep();
 }
 
-function syncTickets() { socket.emit('tablet:update-tickets', { tickets }); }
+/* ============ SYNCHRO ============ */
+function syncTickets() {
+  if (isOnline && socket.connected) {
+    socket.emit('tablet:update-tickets', { tickets });
+  } else {
+    enqueueUpdate({ tickets });
+  }
+}
 
 /* ============ RENDU ============ */
 function formatTime(ms) {
@@ -312,10 +398,11 @@ function getTimerClass(ms) {
 function render() {
   const cards = document.getElementById('cards');
   cards.innerHTML = '';
+  const isPending = !isOnline && pendingQueue.length > 0;
   Object.keys(tickets).sort((a, b) => a - b).forEach(num => {
     const st = tickets[num];
     const div = document.createElement('div');
-    div.className = 'card' + (st === 'ready' ? ' ready' : '');
+    div.className = 'card' + (st === 'ready' ? ' ready' : '') + (isPending ? ' pending' : '');
     const elapsed = (st === 'ready' && readyTimes[num]) ? Date.now() - readyTimes[num] : 0;
     const timerTxt = (st === 'ready' && readyTimes[num]) ? formatTime(elapsed) : '';
     const timerCls = (st === 'ready' && readyTimes[num]) ? getTimerClass(elapsed) : '';
