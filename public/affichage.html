@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Affichage TV — Hocine Chapati</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex-direction:column}
+.tv-head{padding:16px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a1a1a;font-size:14px;color:#666;flex-shrink:0}
+.tv-head b{color:#fff;letter-spacing:.08em}
+.tv-head-right{display:flex;align-items:center;gap:14px}
+#unlockBtn{background:#22c55e;color:#fff;border:none;padding:7px 14px;border-radius:99px;font-weight:700;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif}
+#unlockBtn.hidden{display:none}
+.tv-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:hidden}
+.pairing{text-align:center;width:100%}
+.pairing h2{font-size:20px;color:#888;margin-bottom:20px;font-weight:600}
+.pairing .code{font-size:96px;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:.2em;color:#22c55e;margin:16px 0;line-height:1}
+.pairing p{color:#666;font-size:16px;margin-top:14px}
+.pairing .spinner{width:40px;height:40px;border:3px solid #222;border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pulse{width:16px;height:16px;background:#22c55e;border-radius:50%;box-shadow:0 0 0 10px rgba(34,197,94,.15);animation:pulse 1.6s infinite;margin:0 auto 16px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}70%{box-shadow:0 0 0 14px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.tv-num{font-size:78px;font-weight:900;letter-spacing:-.04em;line-height:1;margin:8px 0 4px;font-family:'JetBrains Mono',monospace}
+.tv-timer{font-size:44px;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:.05em;margin-top:6px;transition:color .3s}
+.tv-timer .label{font-size:14px;font-weight:600;color:#666;letter-spacing:.15em;display:block;margin-bottom:4px;font-family:'Inter',sans-serif}
+.tv-ready{font-size:22px;font-weight:800;color:#22c55e;letter-spacing:.12em;margin-top:8px}
+.tv-sub{margin-top:8px;font-size:16px;color:#aaa}
+.tv-list{margin-top:22px;width:100%;max-width:640px;background:#0f0f0f;border:1px solid #1f1f1f;border-radius:20px;padding:18px}
+.tv-list h3{font-size:12px;letter-spacing:.12em;color:#666;margin-bottom:12px;text-transform:uppercase}
+.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.chip{background:#1a1a1a;border:1px solid #2a2a2a;padding:9px 14px;border-radius:14px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:90px}
+.chip .chip-num{font-size:17px}
+.chip .chip-time{font-size:12px;font-weight:600;opacity:.85;letter-spacing:.03em}
+.chip.new{border-color:#22c55e;animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.85)}100%{transform:scale(1)}}
+.empty{color:#444;font-size:14px}
+#ticketsView{display:none;width:100%;flex-direction:column;align-items:center;justify-content:center;max-height:100%}
+</style>
+</head>
+<body>
+<div class="tv-head">
+  <b>HOCINE CHAPATI</b>
+  <div class="tv-head-right">
+    <button id="unlockBtn">🔊 Activer le son</button>
+    <span id="clock">--:--</span>
+  </div>
+</div>
+<div class="tv-main">
+  <div class="pairing" id="pairing">
+    <div class="spinner"></div>
+    <h2>En attente de la tablette…</h2>
+    <p>Ouvrez l'application sur la tablette et entrez le code</p>
+    <div style="margin-top:26px;font-size:14px;color:#555">Code d'appairage :</div>
+    <div class="code" id="pairingCode">----</div>
+  </div>
+  <div id="ticketsView">
+    <div class="pulse" id="pulse" style="display:none"></div>
+    <div class="tv-num" id="tvNum" style="color:#333">—</div>
+    <div class="tv-timer" id="tvTimer" style="display:none">
+      <span class="label">TEMPS ÉCOULÉ</span>
+      <span id="tvTimerValue">00:00</span>
+    </div>
+    <div class="tv-ready" id="tvReady" style="display:none">✅ PRÊTE</div>
+    <div class="tv-sub" id="tvSub">En attente de commandes…</div>
+    <div class="tv-list">
+      <h3>Commandes prêtes — Récupérez au comptoir</h3>
+      <div class="chips" id="chips"><span class="empty">Aucune pour l'instant</span></div>
+    </div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let lastReady = null;
+let currentTickets = {};
+let currentReadyTimes = {};
+let previousReadySet = new Set();
+
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}, 1000);
+
+let audioUnlocked = false;
+document.getElementById('unlockBtn').addEventListener('click', () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    audioUnlocked = true;
+    document.getElementById('unlockBtn').classList.add('hidden');
+  } catch (e) {}
+});
+
+socket.emit('tv:register');
+
+socket.on('tv:registered', ({ code }) => {
+  document.getElementById('pairingCode').textContent = code;
+});
+
+socket.on('tv:tablet-connected', () => {
+  document.getElementById('pairing').style.display = 'none';
+  document.getElementById('ticketsView').style.display = 'flex';
+  socket.emit('tv:request-state');
+});
+
+socket.on('tv:tickets-updated', ({ tickets, readyTimes }) => {
+  currentTickets = tickets;
+  currentReadyTimes = readyTimes || {};
+  const newReadySet = new Set(Object.keys(tickets).filter(k => tickets[k] === 'ready'));
+  let hasNewReady = false;
+  newReadySet.forEach(n => { if (!previousReadySet.has(n)) hasNewReady = true; });
+  previousReadySet = newReadySet;
+  if (hasNewReady && audioUnlocked) {
+    lastReady = [...newReadySet].sort((a, b) => b - a)[0];
+    beepTV();
+  }
+  renderTV();
+});
+
+socket.on('tv:tablet-disconnected', () => {
+  document.getElementById('pairing').style.display = 'block';
+  document.getElementById('ticketsView').style.display = 'none';
+  previousReadySet = new Set();
+});
+
+// --- Utilitaires chrono ---
+function formatTime(ms) {
+  if (!ms || ms < 0) return '00:00';
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function getTimerColor(elapsedMs) {
+  const sec = Math.floor(elapsedMs / 1000);
+  if (sec < 120) return '#22c55e';       // < 2 min : vert
+  if (sec < 300) return '#f59e0b';       // 2-5 min : orange
+  return '#ef4444';                       // > 5 min : rouge
+}
+
+function updateTimers() {
+  // Timer principal
+  const tvTimer = document.getElementById('tvTimer');
+  const tvTimerValue = document.getElementById('tvTimerValue');
+  if (lastReady && currentReadyTimes[lastReady]) {
+    const elapsed = Date.now() - currentReadyTimes[lastReady];
+    tvTimerValue.textContent = formatTime(elapsed);
+    tvTimerValue.style.color = getTimerColor(elapsed);
+    tvTimer.style.display = 'block';
+  } else {
+    tvTimer.style.display = 'none';
+  }
+
+  // Timers des chips
+  document.querySelectorAll('.chip').forEach(chip => {
+    const num = chip.dataset.num;
+    if (currentReadyTimes[num]) {
+      const elapsed = Date.now() - currentReadyTimes[num];
+      const timeEl = chip.querySelector('.chip-time');
+      if (timeEl) {
+        timeEl.textContent = formatTime(elapsed);
+        timeEl.style.color = getTimerColor(elapsed);
+      }
+    }
+  });
+}
+
+setInterval(updateTimers, 1000);
+
+function renderTV() {
+  const readyList = Object.keys(currentTickets).filter(k => currentTickets[k] === 'ready').sort((a, b) => a - b);
+  const chips = document.getElementById('chips');
+  const tvNum = document.getElementById('tvNum');
+  const tvReady = document.getElementById('tvReady');
+  const tvSub = document.getElementById('tvSub');
+  const pulse = document.getElementById('pulse');
+
+  if (readyList.length === 0) {
+    chips.innerHTML = '<span class="empty">Aucune pour l\'instant</span>';
+    tvNum.textContent = '—'; tvNum.style.color = '#333';
+    tvReady.style.display = 'none'; pulse.style.display = 'none';
+    tvSub.textContent = 'En attente de commandes…';
+    tvSub.style.color = '#aaa'; tvSub.style.fontWeight = '400';
+    document.getElementById('tvTimer').style.display = 'none';
+  } else {
+    chips.innerHTML = readyList.map(n => {
+      const elapsed = currentReadyTimes[n] ? Date.now() - currentReadyTimes[n] : 0;
+      const color = getTimerColor(elapsed);
+      return '<span class="chip ' + (n == lastReady ? 'new' : '') + '" data-num="' + n + '">' +
+        '<span class="chip-num">#' + n + '</span>' +
+        '<span class="chip-time" style="color:' + color + '">' + formatTime(elapsed) + '</span>' +
+        '</span>';
+    }).join('');
+    const last = lastReady || readyList[readyList.length - 1];
+    tvNum.textContent = '#' + last; tvNum.style.color = '#fff';
+    tvReady.style.display = 'block'; pulse.style.display = 'block';
+    tvSub.textContent = 'Récupérez votre commande au comptoir';
+    tvSub.style.color = '#22c55e'; tvSub.style.fontWeight = '800';
+  }
+  updateTimers();
+}
+
+function beepTV() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 880;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(.2, ctx.currentTime);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + .3);
+    o.stop(ctx.currentTime + .31);
+    setTimeout(() => {
+      const o2 = ctx.createOscillator(), g2 = ctx.createGain();
+      o2.type = 'sine'; o2.frequency.value = 1320;
+      o2.connect(g2); g2.connect(ctx.destination);
+      g2.gain.setValueAtTime(.2, ctx.currentTime);
+      o2.start();
+      g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + .3);
+      o2.stop(ctx.currentTime + .31);
+    }, 200);
+  } catch (e) {}
+}
+</script>
+</body>
+</html>

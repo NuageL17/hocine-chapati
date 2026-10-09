@@ -1,0 +1,14 @@
+{
+  "appId": "com.hocine.chapati",
+  "appName": "Hocine Chapati",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#f5f5f7"
+  }
+}

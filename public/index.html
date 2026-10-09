@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Hocine Chapati</title>
+<style>
+body{margin:0;padding:0;background:#f5f5f7;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;color:#111}
+.loader{text-align:center}
+.spinner{width:60px;height:60px;border:4px solid #e5e5e5;border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+h1{font-size:24px;font-weight:900;margin:0 0 8px}
+p{color:#888;font-size:14px}
+</style>
+</head>
+<body>
+<div class="loader">
+  <div class="spinner"></div>
+  <h1>🍔 Hocine Chapati</h1>
+  <p>Chargement…</p>
+</div>
+<script>
+// Redirection automatique vers la page passe (tablette)
+window.location.replace('passe.html');
+</script>
+</body>
+</html>

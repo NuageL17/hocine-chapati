@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Passe — Hocine Chapati</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100vh;overflow-x:hidden}
+.hidden{display:none !important}
+
+.pairing{padding:30px 20px;max-width:560px;margin:0 auto;display:flex;flex-direction:column;min-height:100vh;justify-content:center}
+.pairing h1{font-size:28px;font-weight:900;text-align:center;margin-bottom:6px}
+.pairing p{color:#888;text-align:center;margin-bottom:24px;font-size:15px}
+.code-display{background:#fff;border:2px solid #e5e5e5;border-radius:20px;padding:18px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:52px;letter-spacing:.4em;margin-bottom:20px;min-height:96px;display:flex;align-items:center;justify-content:center;color:#111;cursor:default;user-select:none}
+.code-display .placeholder{color:#ddd}
+.code-display.filled{border-color:#22c55e;color:#22c55e}
+
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}
+.numpad button{background:#fff;border:1.5px solid #e5e5e5;border-radius:18px;padding:22px 0;font-size:32px;font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:.1s;color:#111;user-select:none}
+.numpad button:active{background:#111;color:#fff;transform:scale(.96)}
+.numpad button.action{background:#f0f0f2;font-size:24px}
+
+.confirm-btn{width:100%;padding:20px;border-radius:18px;background:#22c55e;color:#fff;border:none;font-weight:800;font-size:17px;cursor:pointer;transition:.15s}
+.confirm-btn:disabled{opacity:.3;cursor:not-allowed;background:#ccc}
+.confirm-btn:active:not(:disabled){transform:scale(.98)}
+
+.error{color:#ef4444;font-size:14px;margin-top:14px;text-align:center;font-weight:600;min-height:20px}
+
+.t-top{background:#111;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+.t-top h2{font-size:17px;font-weight:800}
+.t-top span{font-size:13px;background:#22c55e;color:#fff;padding:5px 12px;border-radius:99px;font-weight:700}
+.t-stats{display:flex;gap:10px;padding:14px 18px;background:#fff;border-bottom:1px solid #e5e5e5}
+.stat{flex:1;background:#f5f5f7;border-radius:14px;padding:10px;text-align:center}
+.stat b{font-size:22px;display:block}
+.stat i{font-size:12px;color:#888;font-style:normal}
+.cards{padding:16px 18px 100px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.cards{grid-template-columns:1fr}}
+.card{background:#fff;border:1.5px solid #e5e5e5;border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:.2s;position:relative}
+.card.ready{border-color:#22c55e;background:#f0fdf4}
+.card-header{display:flex;justify-content:space-between;align-items:center}
+.card-num{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700}
+.badge{font-size:12px;padding:5px 10px;border-radius:99px;font-weight:700;background:#111;color:#fff}
+.badge.ready{background:#22c55e}
+.card-timer{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#888;text-align:center;padding:4px;letter-spacing:.05em}
+.card-timer.warn{color:#f59e0b}
+.card-timer.danger{color:#ef4444}
+.card-meta{font-size:12px;color:#888;text-align:center}
+.btn-ready{width:100%;padding:13px;border-radius:14px;border:none;font-weight:800;font-size:14px;cursor:pointer;transition:.15s}
+.btn-ready.idle{background:#111;color:#fff}
+.btn-ready.idle:active{background:#000;transform:translateY(-1px)}
+.btn-ready.done{background:#22c55e;color:#fff}
+.btn-undo{background:#fff;border:1px solid #e5e5e5;padding:10px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;width:100%}
+
+.add-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e5e5;padding:12px 18px;display:flex;justify-content:center;box-shadow:0 -4px 20px rgba(0,0,0,.06);z-index:10}
+.add-bar button{width:100%;max-width:500px;padding:16px;border-radius:16px;background:#111;color:#fff;border:none;font-weight:800;cursor:pointer;font-size:16px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:100;animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:#f5f5f7;border-radius:24px 24px 0 0;padding:20px;width:100%;max-width:560px;animation:slideUp .2s ease;max-height:95vh;overflow-y:auto}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal h3{font-size:18px;font-weight:800;text-align:center;margin-bottom:14px}
+.modal .display{background:#fff;border:2px solid #e5e5e5;border-radius:16px;padding:14px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:42px;letter-spacing:.2em;margin-bottom:16px;min-height:76px;display:flex;align-items:center;justify-content:center;color:#111}
+.modal .display.empty{color:#ccc}
+.modal-actions{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.modal-actions .row{display:flex;gap:10px}
+.btn-modal{flex:1;padding:16px;border-radius:16px;border:none;font-weight:800;font-size:15px;cursor:pointer;transition:.15s}
+.btn-modal.cancel{background:#fff;border:1.5px solid #e5e5e5;color:#111}
+.btn-modal.prep{background:#111;color:#fff}
+.btn-modal.ready{background:#22c55e;color:#fff;flex:2}
+.btn-modal:disabled{opacity:.3;cursor:not-allowed}
+.btn-modal:active:not(:disabled){transform:scale(.98)}
+</style>
+</head>
+<body>
+
+<div class="pairing" id="pairingView">
+  <h1>🍔 Hocine Chapati</h1>
+  <p>Entrez le code affiché sur la TV</p>
+  <div class="code-display" id="codeDisplay" tabindex="-1"><span class="placeholder">----</span></div>
+  <div class="numpad" id="numpadCode">
+    <button type="button" onclick="padPress('1')">1</button>
+    <button type="button" onclick="padPress('2')">2</button>
+    <button type="button" onclick="padPress('3')">3</button>
+    <button type="button" onclick="padPress('4')">4</button>
+    <button type="button" onclick="padPress('5')">5</button>
+    <button type="button" onclick="padPress('6')">6</button>
+    <button type="button" onclick="padPress('7')">7</button>
+    <button type="button" onclick="padPress('8')">8</button>
+    <button type="button" onclick="padPress('9')">9</button>
+    <button type="button" class="action" onclick="padClear()">C</button>
+    <button type="button" onclick="padPress('0')">0</button>
+    <button type="button" class="action" onclick="padBack()">⌫</button>
+  </div>
+  <div style="margin-top:14px">
+    <button type="button" class="confirm-btn" id="connectBtn" disabled onclick="tryConnect()">Se connecter</button>
+  </div>
+  <div class="error" id="errorMsg"></div>
+</div>
+
+<div id="mainView" class="hidden">
+  <div class="t-top">
+    <h2>PASSE</h2>
+    <span id="countReady">0 prête</span>
+  </div>
+  <div class="t-stats">
+    <div class="stat"><b id="sEnCours">0</b><i>En cours</i></div>
+    <div class="stat"><b id="sPretes" style="color:#22c55e">0</b><i>Prêtes</i></div>
+    <div class="stat"><b style="color:#22c55e">●</b><i>Connecté</i></div>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div class="add-bar">
+    <button type="button" onclick="openAddModal()">+ Ajouter un ticket</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+let tickets = {};
+let readyTimes = {};
+let currentCode = '';
+
+/* ============ APPAIRAGE ============ */
+function updateCodeDisplay() {
+  const display = document.getElementById('codeDisplay');
+  if (!display) return;
+  if (currentCode.length === 0) {
+    display.innerHTML = '<span class="placeholder">----</span>';
+    display.classList.remove('filled');
+  } else {
+    let txt = '';
+    for (let i = 0; i < 4; i++) {
+      txt += (i < currentCode.length ? currentCode[i] : '•') + (i < 3 ? ' ' : '');
+    }
+    display.textContent = txt;
+    if (currentCode.length === 4) display.classList.add('filled');
+    else display.classList.remove('filled');
+  }
+  const btn = document.getElementById('connectBtn');
+  if (btn) btn.disabled = currentCode.length !== 4;
+  document.getElementById('errorMsg').textContent = '';
+}
+
+function padPress(n) {
+  if (currentCode.length >= 4) return;
+  currentCode += n;
+  updateCodeDisplay();
+  vibrate(10);
+  if (currentCode.length === 4) setTimeout(tryConnect, 300);
+}
+function padClear() { currentCode = ''; updateCodeDisplay(); vibrate(10); }
+function padBack() { currentCode = currentCode.slice(0, -1); updateCodeDisplay(); vibrate(10); }
+
+function tryConnect() {
+  if (currentCode.length !== 4) return;
+  socket.emit('tablet:connect', { code: currentCode });
+}
+
+socket.on('tablet:connected', ({ tickets: t }) => {
+  tickets = t || {};
+  // Charger les readyTimes depuis le serveur
+  socket.emit('tablet:request-ready-times');
+  document.getElementById('pairingView').classList.add('hidden');
+  document.getElementById('mainView').classList.remove('hidden');
+  render();
+});
+
+socket.on('tablet:ready-times', (rt) => {
+  readyTimes = rt || {};
+  render();
+});
+
+socket.on('tablet:error', (msg) => {
+  document.getElementById('errorMsg').textContent = msg;
+  currentCode = '';
+  updateCodeDisplay();
+  vibrate([50, 30, 50]);
+});
+
+function vibrate(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+}
+
+/* ============ MODALE AJOUT ============ */
+let modalCode = '';
+
+function openAddModal() {
+  modalCode = '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'modalOverlay';
+
+  let numpadHTML = '';
+  for (let i = 1; i <= 9; i++) {
+    numpadHTML += '<button type="button" data-num="' + i + '">' + i + '</button>';
+  }
+  numpadHTML += '<button type="button" data-action="clear">C</button>';
+  numpadHTML += '<button type="button" data-num="0">0</button>';
+  numpadHTML += '<button type="button" data-action="back">⌫</button>';
+
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>N° du ticket</h3>
+      <div class="display empty" id="modalDisplay">----</div>
+      <div class="numpad" id="modalNumpad">${numpadHTML}</div>
+      <div class="modal-actions">
+        <div class="row">
+          <button type="button" id="modalCancel" class="btn-modal cancel">Annuler</button>
+          <button type="button" id="modalAddPrep" class="btn-modal prep" disabled>En cours</button>
+          <button type="button" id="modalAddReady" class="btn-modal ready" disabled>✅ Ajouter PRÊT</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.querySelectorAll('#modalNumpad button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const num = btn.getAttribute('data-num');
+      const action = btn.getAttribute('data-action');
+      if (num !== null) modalPad(num);
+      else if (action === 'clear') modalClear();
+      else if (action === 'back') modalBack();
+    });
+  });
+
+  document.getElementById('modalCancel').addEventListener('click', closeAddModal);
+  document.getElementById('modalAddPrep').addEventListener('click', () => confirmAddModal('prep'));
+  document.getElementById('modalAddReady').addEventListener('click', () => confirmAddModal('ready'));
+
+  updateModalDisplay();
+}
+
+function updateModalDisplay() {
+  const display = document.getElementById('modalDisplay');
+  if (!display) return;
+  if (modalCode.length === 0) {
+    display.textContent = '----';
+    display.classList.add('empty');
+  } else {
+    display.textContent = modalCode;
+    display.classList.remove('empty');
+  }
+  const hasValue = modalCode.length > 0;
+  ['modalAddPrep', 'modalAddReady'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = !hasValue;
+      btn.style.opacity = hasValue ? '1' : '.3';
+    }
+  });
+}
+
+function modalPad(n) {
+  if (modalCode.length >= 4) return;
+  modalCode += n;
+  updateModalDisplay();
+  vibrate(10);
+}
+function modalClear() { modalCode = ''; updateModalDisplay(); vibrate(10); }
+function modalBack() { modalCode = modalCode.slice(0, -1); updateModalDisplay(); vibrate(10); }
+
+function closeAddModal() {
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.remove();
+}
+
+function confirmAddModal(status) {
+  const n = parseInt(modalCode, 10);
+  if (!n || tickets[n]) {
+    alert('Numéro invalide ou déjà existant');
+    modalClear();
+    return;
+  }
+  tickets[n] = status; // 'prep' ou 'ready'
+  syncTickets();
+  render();
+  closeAddModal();
+  if (status === 'ready') beep();
+}
+
+/* ============ SYNCHRO ============ */
+function syncTickets() { socket.emit('tablet:update-tickets', { tickets }); }
+
+/* ============ RENDU ============ */
+function formatTime(ms) {
+  if (!ms || ms < 0) return '00:00';
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function getTimerClass(ms) {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 120) return '';
+  if (sec < 300) return 'warn';
+  return 'danger';
+}
+
+function render() {
+  const cards = document.getElementById('cards');
+  cards.innerHTML = '';
+  Object.keys(tickets).sort((a, b) => a - b).forEach(num => {
+    const st = tickets[num];
+    const div = document.createElement('div');
+    div.className = 'card' + (st === 'ready' ? ' ready' : '');
+    const elapsed = (st === 'ready' && readyTimes[num]) ? Date.now() - readyTimes[num] : 0;
+    const timerTxt = (st === 'ready' && readyTimes[num]) ? formatTime(elapsed) : '';
+    const timerCls = (st === 'ready' && readyTimes[num]) ? getTimerClass(elapsed) : '';
+    div.innerHTML = `
+      <div class="card-header">
+        <div class="card-num">#${num}</div>
+        <span class="badge ${st === 'ready' ? 'ready' : ''}">${st === 'ready' ? 'PRÊTE' : 'EN COURS'}</span>
+      </div>
+      ${timerTxt ? `<div class="card-timer ${timerCls}" data-num="${num}">⏱ ${timerTxt}</div>` : ''}
+      <div class="card-meta">${st === 'ready' ? 'Au passe' : 'En préparation'}</div>
+      ${st === 'prep'
+        ? `<button class="btn-ready idle" onclick="setReady(${num})">PRÊT →</button>`
+        : `<button class="btn-ready done" onclick="setRetrieved(${num})">✅ RÉCUPÉRÉ — Retirer</button><button class="btn-undo" onclick="setPrep(${num})">↩ Remettre en cours</button>`
+      }
+    `;
+    cards.appendChild(div);
+  });
+
+  const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready');
+  document.getElementById('sEnCours').textContent = Object.keys(tickets).length - readyList.length;
+  document.getElementById('sPretes').textContent = readyList.length;
+  document.getElementById('countReady').textContent = readyList.length + ' prête' + (readyList.length !== 1 ? 's' : '');
+}
+
+function updateTimers() {
+  document.querySelectorAll('.card-timer').forEach(el => {
+    const num = el.dataset.num;
+    if (readyTimes[num]) {
+      const elapsed = Date.now() - readyTimes[num];
+      el.textContent = '⏱ ' + formatTime(elapsed);
+      el.className = 'card-timer ' + getTimerClass(elapsed);
+    }
+  });
+}
+
+setInterval(updateTimers, 1000);
+
+function setReady(n) { tickets[n] = 'ready'; syncTickets(); render(); beep(); vibrate(20); }
+function setPrep(n) { tickets[n] = 'prep'; syncTickets(); render(); }
+function setRetrieved(n) { delete tickets[n]; syncTickets(); render(); }
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(.15, ctx.currentTime);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + .35); o.stop(ctx.currentTime + .36);
+  } catch (e) {}
+}
+
+updateCodeDisplay();
+console.log('[PASSE] Prêt');
+</script>
+</body>
+</html>

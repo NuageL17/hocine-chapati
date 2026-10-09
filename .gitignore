@@ -1,0 +1,20 @@
+# Dépendances
+node_modules/
+
+# Données locales
+data/
+
+# Android (compilé en local)
+android/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
