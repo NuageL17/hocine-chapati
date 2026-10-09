@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caisse - Hocine Chapati</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100vh}
+.top{background:#111;color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+.top h1{font-size:20px;font-weight:900;letter-spacing:.05em}
+.top .actions{display:flex;gap:10px;align-items:center}
+.top button{background:#22c55e;color:#fff;border:none;padding:12px 20px;border-radius:12px;font-weight:800;font-size:14px;cursor:pointer;transition:.15s;font-family:'Inter',sans-serif}
+.top button:hover{background:#16a34a;transform:translateY(-1px)}
+.top button.secondary{background:rgba(255,255,255,.1)}
+.top button.secondary:hover{background:rgba(255,255,255,.2)}
+.top .status{font-size:12px;color:#888;margin-left:10px}
+.top .status.online{color:#22c55e}
+.top .status.offline{color:#ef4444}
+.container{max-width:900px;margin:0 auto;padding:24px}
+.section-title{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#888;font-weight:800;margin-bottom:14px}
+.ticket-card{background:#fff;border:2px solid #e5e5e5;border-radius:20px;padding:20px;margin-bottom:14px;display:flex;align-items:center;gap:20px;transition:.2s}
+.ticket-card:hover{border-color:#22c55e;box-shadow:0 4px 20px rgba(34,197,94,.1)}
+.ticket-card .big-num{font-family:'JetBrains Mono',monospace;font-weight:900;font-size:56px;color:#111;line-height:1;min-width:130px}
+.ticket-card .info{flex:1}
+.ticket-card .info .time-row{font-size:14px;color:#666;margin-bottom:4px}
+.ticket-card .info .time-row b{color:#111;font-weight:800;font-family:'JetBrains Mono',monospace}
+.ticket-card .info .waited{font-size:12px;color:#888;margin-top:6px}
+.ticket-card .info .waited.warn{color:#f59e0b;font-weight:700}
+.ticket-card .info .waited.danger{color:#ef4444;font-weight:700}
+.ticket-card .print-btn{background:#111;color:#fff;border:none;padding:14px 24px;border-radius:14px;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:8px}
+.ticket-card .print-btn:hover{background:#000;transform:translateY(-1px)}
+.empty{text-align:center;padding:60px 20px;color:#888}
+.empty .icon{font-size:64px;margin-bottom:16px}
+.empty h2{font-size:18px;font-weight:800;color:#111;margin-bottom:6px}
+.connection-badge{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#ef4444;color:#fff;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:700;z-index:200;display:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.connection-badge.show{display:block}
+
+/* === ZONE D'IMPRESSION (cachée à l'écran) === */
+#printZone{display:none}
+
+/* === STYLES D'IMPRESSION === */
+@media print {
+  body * { visibility: hidden; }
+  #printZone, #printZone * { visibility: visible; }
+  #printZone {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    padding: 4mm;
+    font-family: 'Courier New', monospace;
+    color: #000;
+    background: #fff;
+  }
+  .print-ticket {
+    text-align: center;
+    padding-bottom: 6mm;
+    border-bottom: 1px dashed #000;
+    margin-bottom: 4mm;
+  }
+  .print-ticket .shop { font-size: 12pt; font-weight: bold; letter-spacing: .15em; margin-bottom: 3mm; }
+  .print-ticket .big-num { font-size: 64pt; font-weight: bold; line-height: 1; margin: 3mm 0; letter-spacing: .05em; }
+  .print-ticket .label { font-size: 9pt; margin-bottom: 2mm; }
+  .print-ticket .time { font-size: 10pt; margin-top: 2mm; }
+  .print-ticket .sep { border-top: 1px dashed #000; margin: 3mm 0; }
+  .print-ticket .footer { font-size: 9pt; margin-top: 3mm; letter-spacing: .1em; }
+  @page { margin: 0; size: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>HOCINE CHAPATI - CAISSE</h1>
+  <div class="actions">
+    <span class="status" id="status">●</span>
+    <button class="secondary" onclick="testPrint()">Test imprimante</button>
+    <button id="printAllBtn" onclick="printAll()">Tout imprimer</button>
+  </div>
+</div>
+
+<div class="connection-badge" id="connBadge">Hors ligne</div>
+
+<div class="container">
+  <div class="section-title">Tickets prets a imprimer</div>
+  <div id="list"><div class="empty"><div class="icon">👨‍🍳</div><h2>Aucun ticket pret</h2><p>En attente de la cuisine...</p></div></div>
+</div>
+
+<div id="printZone"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io({ reconnection: true, reconnectionDelay: 1000, reconnectionAttempts: Infinity });
+let tickets = {};
+let readyTimes = {};
+let createdTimes = {};
+let isOnline = false;
+
+const savedCode = localStorage.getItem('hc_caisse_code') || localStorage.getItem('hc_tablet_code') || '';
+
+socket.on('connect', () => {
+  isOnline = true;
+  document.getElementById('connBadge').classList.remove('show');
+  setStatus(true);
+  // Se connecter comme tablette pour recevoir les tickets
+  if (savedCode) {
+    socket.emit('tablet:connect', { code: savedCode });
+  }
+});
+
+socket.on('disconnect', () => {
+  isOnline = false;
+  document.getElementById('connBadge').classList.add('show');
+  setStatus(false);
+});
+
+socket.on('connect_error', () => {
+  isOnline = false;
+  document.getElementById('connBadge').classList.add('show');
+  setStatus(false);
+});
+
+function setStatus(online) {
+  const s = document.getElementById('status');
+  s.textContent = online ? '● Connecte' : '● Hors ligne';
+  s.className = 'status ' + (online ? 'online' : 'offline');
+}
+
+socket.on('tablet:connected', ({ tickets: t, lastNumber }) => {
+  tickets = t || {};
+  // On a besoin du code sauvegarde
+  if (!savedCode && lastNumber) {
+    console.log('Code non sauvegarde, demandez a la tablette');
+  }
+  socket.emit('tablet:request-ready-times');
+  render();
+});
+
+socket.on('tablet:ready-times', (rt) => {
+  readyTimes = rt || {};
+  render();
+});
+
+socket.on('tv:tickets-updated', ({ tickets: t, readyTimes: rt }) => {
+  tickets = t || {};
+  readyTimes = rt || {};
+  render();
+});
+
+socket.on('tablet:error', (msg) => {
+  console.log('Erreur:', msg);
+  // Si le code est invalide, demander a l'utilisateur
+  const code = prompt('Entrez le code affiche sur la TV pour connecter la caisse:');
+  if (code && code.length === 4) {
+    localStorage.setItem('hc_caisse_code', code);
+    socket.emit('tablet:connect', { code });
+  }
+});
+
+/* === RENDU === */
+function formatTime(ms) {
+  if (!ms || ms < 0) return '--:--';
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return h + 'h' + String(mm).padStart(2, '0');
+  }
+  return m + 'm ' + String(s).padStart(2, '0') + 's';
+}
+
+function fmtHeure(ts) {
+  if (!ts) return '--:--';
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function getWaitClass(ms) {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 120) return '';
+  if (sec < 300) return 'warn';
+  return 'danger';
+}
+
+function render() {
+  const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready').sort((a, b) => a - b);
+  const list = document.getElementById('list');
+
+  if (readyList.length === 0) {
+    list.innerHTML = '<div class="empty"><div class="icon">👨‍🍳</div><h2>Aucun ticket pret</h2><p>En attente de la cuisine...</p></div>';
+    return;
+  }
+
+  list.innerHTML = readyList.map(num => {
+    const readyTs = readyTimes[num];
+    const waitMs = readyTs ? Date.now() - readyTs : 0;
+    const waitCls = getWaitClass(waitMs);
+    return '<div class="ticket-card">' +
+      '<div class="big-num">#' + num + '</div>' +
+      '<div class="info">' +
+        '<div class="time-row">Pret a : <b>' + fmtHeure(readyTs) + '</b></div>' +
+        '<div class="waited ' + waitCls + '">En attente depuis ' + formatTime(waitMs) + '</div>' +
+      '</div>' +
+      '<button class="print-btn" onclick="printTicket(' + num + ')">🖨 Imprimer</button>' +
+    '</div>';
+  }).join('');
+
+  updateTimers();
+}
+
+function updateTimers() {
+  const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready');
+  const cards = document.querySelectorAll('.ticket-card');
+  cards.forEach((card, i) => {
+    const num = readyList[i];
+    if (num && readyTimes[num]) {
+      const waitMs = Date.now() - readyTimes[num];
+      const el = card.querySelector('.waited');
+      if (el) {
+        el.textContent = 'En attente depuis ' + formatTime(waitMs);
+        el.className = 'waited ' + getWaitClass(waitMs);
+      }
+    }
+  });
+}
+
+setInterval(updateTimers, 1000);
+
+/* === IMPRESSION === */
+function buildPrintHTML(nums) {
+  const now = new Date();
+  const dateStr = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+  const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  return nums.map(num => {
+    const readyTs = readyTimes[num];
+    return '<div class="print-ticket">' +
+      '<div class="shop">HOCINE CHAPATI</div>' +
+      '<div class="sep"></div>' +
+      '<div class="label">COMMANDE N°</div>' +
+      '<div class="big-num">' + num + '</div>' +
+      '<div class="sep"></div>' +
+      '<div class="time">Pret a : ' + fmtHeure(readyTs) + '</div>' +
+      '<div class="time">Imprime a : ' + timeStr + '</div>' +
+      '<div class="time">' + dateStr + '</div>' +
+      '<div class="footer">*** MERCI ***</div>' +
+    '</div>';
+  }).join('');
+}
+
+function printTicket(num) {
+  const zone = document.getElementById('printZone');
+  zone.innerHTML = buildPrintHTML([num]);
+  setTimeout(() => { window.print(); }, 100);
+}
+
+function printAll() {
+  const readyList = Object.keys(tickets).filter(k => tickets[k] === 'ready').sort((a, b) => a - b);
+  if (readyList.length === 0) { alert('Aucun ticket a imprimer'); return; }
+  const zone = document.getElementById('printZone');
+  zone.innerHTML = buildPrintHTML(readyList);
+  setTimeout(() => { window.print(); }, 100);
+}
+
+function testPrint() {
+  const zone = document.getElementById('printZone');
+  zone.innerHTML = '<div class="print-ticket">' +
+    '<div class="shop">HOCINE CHAPATI</div>' +
+    '<div class="sep"></div>' +
+    '<div class="label">TEST IMPRIMANTE</div>' +
+    '<div class="big-num">OK</div>' +
+    '<div class="sep"></div>' +
+    '<div class="time">' + new Date().toLocaleString('fr-FR') + '</div>' +
+    '<div class="footer">*** TEST ***</div>' +
+  '</div>';
+  setTimeout(() => { window.print(); }, 100);
+}
+
+render();
+</script>
+</body>
+</html>

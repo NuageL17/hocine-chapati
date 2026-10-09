@@ -21,6 +21,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/affichage', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affichage.html')));
 app.get('/passe', (req, res) => res.sendFile(path.join(__dirname, 'public', 'passe.html')));
+app.get('/caisse', (req, res) => res.sendFile(path.join(__dirname, 'public', 'caisse.html')));
 
 const TicketSchema = new mongoose.Schema({
   num: { type: Number, required: true, index: true },
