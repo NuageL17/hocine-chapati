@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Affichage TV â€” Hocine Chapati</title>
+<title>Affichage TV - Hocine Chapati</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -51,22 +51,22 @@ body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex
 <div class="tv-main">
   <div class="pairing" id="pairing">
     <div class="spinner"></div>
-    <h2>En attente de la tabletteâ€¦</h2>
+    <h2>En attente de la tablettea€¦</h2>
     <p>Ouvrez l'application sur la tablette et entrez le code</p>
     <div style="margin-top:26px;font-size:14px;color:#555">Code d'appairage :</div>
     <div class="code" id="pairingCode">----</div>
   </div>
   <div id="ticketsView">
     <div class="pulse" id="pulse" style="display:none"></div>
-    <div class="tv-num" id="tvNum" style="color:#333">â€”</div>
+    <div class="tv-num" id="tvNum" style="color:#333">a€”</div>
     <div class="tv-timer" id="tvTimer" style="display:none">
       <span class="label">TEMPS Ã‰COULÃ‰</span>
       <span id="tvTimerValue">00:00</span>
     </div>
-    <div class="tv-ready" id="tvReady" style="display:none">âœ… PRÃŠTE</div>
-    <div class="tv-sub" id="tvSub">En attente de commandesâ€¦</div>
+    <div class="tv-ready" id="tvReady" style="display:none">aœ... PRÃŠTE</div>
+    <div class="tv-sub" id="tvSub">En attente de commandesa€¦</div>
     <div class="tv-list">
-      <h3>Commandes prÃªtes â€” RÃ©cupÃ©rez au comptoir</h3>
+      <h3>Commandes prÃªtes a€” RÃ©cupÃ©rez au comptoir</h3>
       <div class="chips" id="chips"><span class="empty">Aucune pour l'instant</span></div>
     </div>
   </div>
@@ -185,9 +185,9 @@ function renderTV() {
 
   if (readyList.length === 0) {
     chips.innerHTML = '<span class="empty">Aucune pour l\'instant</span>';
-    tvNum.textContent = 'â€”'; tvNum.style.color = '#333';
+    tvNum.textContent = 'a€”'; tvNum.style.color = '#333';
     tvReady.style.display = 'none'; pulse.style.display = 'none';
-    tvSub.textContent = 'En attente de commandesâ€¦';
+    tvSub.textContent = 'En attente de commandesa€¦';
     tvSub.style.color = '#aaa'; tvSub.style.fontWeight = '400';
     document.getElementById('tvTimer').style.display = 'none';
   } else {

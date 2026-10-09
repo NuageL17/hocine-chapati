@@ -14,6 +14,13 @@ const STATE_FILE = path.join(DATA_DIR, 'state.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
+// Forcer l'encodage UTF-8 sur les pages HTML
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path === '/' || !req.path.includes('.')) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 app.get('/affichage', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affichage.html')));
 app.get('/passe', (req, res) => res.sendFile(path.join(__dirname, 'public', 'passe.html')));

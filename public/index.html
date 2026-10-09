@@ -37,7 +37,7 @@ h1{font-size:32px;font-weight:900;margin-bottom:8px;text-align:center}
     <div class="icon">📺</div>
     <div class="content">
       <div class="title">Affichage TV</div>
-      <div class="desc">Écran client — commandes prêtes</div>
+      <div class="desc">ecran client - commandes pretes</div>
     </div>
     <div class="arrow">→</div>
   </a>
@@ -45,40 +45,40 @@ h1{font-size:32px;font-weight:900;margin-bottom:8px;text-align:center}
     <div class="icon">📱</div>
     <div class="content">
       <div class="title">Passe cuisine</div>
-      <div class="desc">Tablette — gestion des tickets</div>
+      <div class="desc">Tablette - gestion des tickets</div>
     </div>
     <div class="arrow">→</div>
   </a>
 </div>
 
 <div class="footer">
-  Astuce : accédez directement à <b>/affichage</b> ou <b>/passe</b><br>
-  pour éviter cet écran sur vos appareils dédiés.
+  Astuce : accedez directement a <b>/affichage</b> ou <b>/passe</b><br>
+  pour eviter cet ecran sur vos appareils dedies.
 </div>
 
 <div id="autoRedirect" style="display:none;text-align:center">
   <div class="spinner"></div>
-  <div class="redirecting" id="redirectMsg">Redirection…</div>
+  <div class="redirecting" id="redirectMsg">Redirection...</div>
 </div>
 
 <script>
-// Détection automatique UNIQUEMENT si l'utilisateur vient d'une URL courte
-// et si aucun paramètre "menu" n'est présent
+// Detection automatique UNIQUEMENT si l'utilisateur vient d'une URL courte
+// et si aucun parametre "menu" n'est present
 const urlParams = new URLSearchParams(window.location.search);
 const forceMenu = urlParams.has('menu');
 
 if (!forceMenu) {
-  // Détection de l'appareil
+  // Detection de l'appareil
   const width = window.innerWidth;
   const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
   const isTablet = /iPad|Tablet|Android/i.test(navigator.userAgent) && width >= 600 && width < 1200;
   const isTV = width >= 1024 && !isMobile && !isTablet;
   
-  // Si TV (écran large sans mobile), on redirige vers affichage
+  // Si TV (ecran large sans mobile), on redirige vers affichage
   if (isTV) {
     document.getElementById('choices').style.display = 'none';
     document.getElementById('autoRedirect').style.display = 'block';
-    document.getElementById('redirectMsg').textContent = 'Redirection vers l\'affichage TV…';
+    document.getElementById('redirectMsg').textContent = 'Redirection vers l\'affichage TV...';
     setTimeout(() => {
       window.location.replace('affichage.html');
     }, 400);
@@ -87,7 +87,7 @@ if (!forceMenu) {
   else if (isMobile || isTablet) {
     document.getElementById('choices').style.display = 'none';
     document.getElementById('autoRedirect').style.display = 'block';
-    document.getElementById('redirectMsg').textContent = 'Redirection vers le passe…';
+    document.getElementById('redirectMsg').textContent = 'Redirection vers le passe...';
     setTimeout(() => {
       window.location.replace('passe.html');
     }, 400);

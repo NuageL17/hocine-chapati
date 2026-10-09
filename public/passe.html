@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Passe â€” Hocine Chapati</title>
+<title>Passe - Hocine Chapati</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -91,7 +91,7 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
     <button type="button" onclick="padPress('9')">9</button>
     <button type="button" class="action" onclick="padClear()">C</button>
     <button type="button" onclick="padPress('0')">0</button>
-    <button type="button" class="action" onclick="padBack()">âŒ«</button>
+    <button type="button" class="action" onclick="padBack()">aŒ«</button>
   </div>
   <div style="margin-top:14px">
     <button type="button" class="confirm-btn" id="connectBtn" disabled onclick="tryConnect()">Se connecter</button>
@@ -107,7 +107,7 @@ body{font-family:'Inter',sans-serif;background:#f5f5f7;color:#111;min-height:100
   <div class="t-stats">
     <div class="stat"><b id="sEnCours">0</b><i>En cours</i></div>
     <div class="stat"><b id="sPretes" style="color:#22c55e">0</b><i>PrÃªtes</i></div>
-    <div class="stat"><b style="color:#22c55e">â—</b><i>ConnectÃ©</i></div>
+    <div class="stat"><b style="color:#22c55e">a-</b><i>ConnectÃ©</i></div>
   </div>
   <div class="cards" id="cards"></div>
   <div class="add-bar">
@@ -132,7 +132,7 @@ function updateCodeDisplay() {
   } else {
     let txt = '';
     for (let i = 0; i < 4; i++) {
-      txt += (i < currentCode.length ? currentCode[i] : 'â€¢') + (i < 3 ? ' ' : '');
+      txt += (i < currentCode.length ? currentCode[i] : 'a€¢') + (i < 3 ? ' ' : '');
     }
     display.textContent = txt;
     if (currentCode.length === 4) display.classList.add('filled');
@@ -199,18 +199,18 @@ function openAddModal() {
   }
   numpadHTML += '<button type="button" data-action="clear">C</button>';
   numpadHTML += '<button type="button" data-num="0">0</button>';
-  numpadHTML += '<button type="button" data-action="back">âŒ«</button>';
+  numpadHTML += '<button type="button" data-action="back">aŒ«</button>';
 
   overlay.innerHTML = `
     <div class="modal">
-      <h3>NÂ° du ticket</h3>
+      <h3>Na° du ticket</h3>
       <div class="display empty" id="modalDisplay">----</div>
       <div class="numpad" id="modalNumpad">${numpadHTML}</div>
       <div class="modal-actions">
         <div class="row">
           <button type="button" id="modalCancel" class="btn-modal cancel">Annuler</button>
           <button type="button" id="modalAddPrep" class="btn-modal prep" disabled>En cours</button>
-          <button type="button" id="modalAddReady" class="btn-modal ready" disabled>âœ… Ajouter PRÃŠT</button>
+          <button type="button" id="modalAddReady" class="btn-modal ready" disabled>aœ... Ajouter PRÃŠT</button>
         </div>
       </div>
     </div>
@@ -272,7 +272,7 @@ function closeAddModal() {
 function confirmAddModal(status) {
   const n = parseInt(modalCode, 10);
   if (!n || tickets[n]) {
-    alert('NumÃ©ro invalide ou dÃ©jÃ  existant');
+    alert('NumÃ©ro invalide ou dÃ©jÃ  existant');
     modalClear();
     return;
   }
@@ -322,11 +322,11 @@ function render() {
         <div class="card-num">#${num}</div>
         <span class="badge ${st === 'ready' ? 'ready' : ''}">${st === 'ready' ? 'PRÃŠTE' : 'EN COURS'}</span>
       </div>
-      ${timerTxt ? `<div class="card-timer ${timerCls}" data-num="${num}">â± ${timerTxt}</div>` : ''}
+      ${timerTxt ? `<div class="card-timer ${timerCls}" data-num="${num}">a± ${timerTxt}</div>` : ''}
       <div class="card-meta">${st === 'ready' ? 'Au passe' : 'En prÃ©paration'}</div>
       ${st === 'prep'
-        ? `<button class="btn-ready idle" onclick="setReady(${num})">PRÃŠT â†’</button>`
-        : `<button class="btn-ready done" onclick="setRetrieved(${num})">âœ… RÃ‰CUPÃ‰RÃ‰ â€” Retirer</button><button class="btn-undo" onclick="setPrep(${num})">â†© Remettre en cours</button>`
+        ? `<button class="btn-ready idle" onclick="setReady(${num})">PRÃŠT a†’</button>`
+        : `<button class="btn-ready done" onclick="setRetrieved(${num})">aœ... RÃ‰CUPÃ‰RÃ‰ a€” Retirer</button><button class="btn-undo" onclick="setPrep(${num})">a†© Remettre en cours</button>`
       }
     `;
     cards.appendChild(div);
@@ -343,7 +343,7 @@ function updateTimers() {
     const num = el.dataset.num;
     if (readyTimes[num]) {
       const elapsed = Date.now() - readyTimes[num];
-      el.textContent = 'â± ' + formatTime(elapsed);
+      el.textContent = 'a± ' + formatTime(elapsed);
       el.className = 'card-timer ' + getTimerClass(elapsed);
     }
   });
