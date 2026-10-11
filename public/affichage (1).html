@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Affichage TV - Hocine Chapati</title>
+<link rel="manifest" href="/manifest-affichage.json">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',sans-serif;background:#000;color:#fff;display:flex;flex-direction:column}
+.tv-head{padding:16px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1a1a1a;font-size:14px;color:#666;flex-shrink:0}
+.tv-head b{color:#fff;letter-spacing:.08em}
+.tv-head-right{display:flex;align-items:center;gap:14px}
+#unlockBtn{background:#22c55e;color:#fff;border:none;padding:7px 14px;border-radius:99px;font-weight:700;cursor:pointer;font-size:12px;font-family:'Inter',sans-serif}
+#unlockBtn.hidden{display:none}
+.conn-badge{background:#ef4444;color:#fff;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;display:none}
+.conn-badge.show{display:block}
+.tv-main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center;overflow:hidden}
+.pairing{text-align:center;width:100%}
+.pairing h2{font-size:20px;color:#888;margin-bottom:20px;font-weight:600}
+.pairing .code{font-size:96px;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:.2em;color:#22c55e;margin:16px 0;line-height:1}
+.pairing p{color:#666;font-size:16px;margin-top:14px}
+.pairing .spinner{width:40px;height:40px;border:3px solid #222;border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;margin:16px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pulse{width:16px;height:16px;background:#22c55e;border-radius:50%;box-shadow:0 0 0 10px rgba(34,197,94,.15);animation:pulse 1.6s infinite;margin:0 auto 16px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}70%{box-shadow:0 0 0 14px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.tv-num{font-size:78px;font-weight:900;letter-spacing:-.04em;line-height:1;margin:8px 0 4px;font-family:'JetBrains Mono',monospace}
+.tv-timer{font-size:44px;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:.05em;margin-top:6px;transition:color .3s}
+.tv-timer .label{font-size:14px;font-weight:600;color:#666;letter-spacing:.15em;display:block;margin-bottom:4px;font-family:'Inter',sans-serif}
+.tv-ready{font-size:22px;font-weight:800;color:#22c55e;letter-spacing:.12em;margin-top:8px}
+.tv-sub{margin-top:8px;font-size:16px;color:#aaa}
+.tv-list{margin-top:22px;width:100%;max-width:640px;background:#0f0f0f;border:1px solid #1f1f1f;border-radius:20px;padding:18px}
+.tv-list h3{font-size:12px;letter-spacing:.12em;color:#666;margin-bottom:12px;text-transform:uppercase}
+.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.chip{background:#1a1a1a;border:1px solid #2a2a2a;padding:9px 14px;border-radius:14px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:90px}
+.chip .chip-num{font-size:17px}
+.chip .chip-time{font-size:12px;font-weight:600;opacity:.85;letter-spacing:.03em}
+.chip.new{border-color:#22c55e;animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.85)}100%{transform:scale(1)}}
+.empty{color:#444;font-size:14px}
+#ticketsView{display:none;width:100%;flex-direction:column;align-items:center;justify-content:center;max-height:100%}
+/* === NOUVELLE COMMANDE : CLIGNOTANT === */
+#flashFrame{position:fixed;top:0;left:0;right:0;bottom:0;border:14px solid #22c55e;pointer-events:none;z-index:100;opacity:0;display:none}
+#flashFrame.on{display:block;animation:frameBlink .7s ease-in-out infinite}
+@keyframes frameBlink{0%,100%{opacity:0}50%{opacity:1}}
+.tv-num.blink{animation:numBlink .7s ease-in-out infinite}
+@keyframes numBlink{0%,100%{opacity:1;color:#fff}50%{opacity:.2;color:#22c55e}}
+.chip.blink{animation:chipBlink .7s ease-in-out infinite;border-color:#22c55e}
+@keyframes chipBlink{0%,100%{background:#1a1a1a;transform:scale(1)}50%{background:#14532d;transform:scale(1.08)}}
+</style>
+</head>
+<body>
+<div id="flashFrame"></div>
+<div class="tv-head">
+  <b>HOCINE CHAPATI</b>
+  <div class="tv-head-right">
+    <span class="conn-badge" id="connBadge">Hors ligne</span>
+    <button id="unlockBtn">Activer le son</button>
+    <span id="clock">--:--</span>
+  </div>
+</div>
+<div class="tv-main">
+  <div class="pairing" id="pairing">
+    <div class="spinner"></div>
+    <h2>En attente de la tablette...</h2>
+    <p>Ouvrez l'application sur la tablette et entrez le code</p>
+    <div style="margin-top:26px;font-size:14px;color:#555">Code d'appairage :</div>
+    <div class="code" id="pairingCode">----</div>
+  </div>
+  <div id="ticketsView">
+    <div class="pulse" id="pulse" style="display:none"></div>
+    <div class="tv-num" id="tvNum" style="color:#333">--</div>
+    <div class="tv-timer" id="tvTimer" style="display:none">
+      <span class="label">TEMPS ECOULE</span>
+      <span id="tvTimerValue">00:00</span>
+    </div>
+    <div class="tv-ready" id="tvReady" style="display:none">PRETE</div>
+    <div class="tv-sub" id="tvSub">En attente de commandes...</div>
+    <div class="tv-list">
+      <h3>Commandes pretes - Recuperez au comptoir</h3>
+      <div class="chips" id="chips"><span class="empty">Aucune pour l'instant</span></div>
+    </div>
+  </div>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io({ reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 5000, reconnectionAttempts: Infinity });
+let lastReady = null;
+let currentTickets = {};
+let currentReadyTimes = {};
+let previousReadySet = new Set();
+let hasBeenConnected = false;
+let mainTicket = null;   // numero affiche en gros sur la TV
+let firstSync = true;    // la 1ere synchro apres ouverture de la page n'est jamais annoncee
+
+/* =====================================================================
+   REGLAGES DES ANNONCES (bip + voix + musique + clignotant)
+   Tu peux changer ces valeurs sans toucher au reste du code.
+   ===================================================================== */
+const CONFIG_ANNONCE = {
+  voix: true,               // true = lit le numero a voix haute / false = bip seulement
+  phrase: function (n) { return 'Commande num\u00e9ro ' + n; },   // texte lu (\u00e9 = e accent aigu)
+  repetitions: 1,           // combien de fois le numero est lu (2 = lu deux fois)
+  volumeBip: 0.7,           // volume du bip : 0 a 1
+  gainVoix: 2.5,            // volume de la voix MP3 : 1 = normal, 2.5 = beaucoup plus fort (baisse si ca sature)
+  voixDeSecours: true,      // si le MP3 du numero n'existe pas (ex: au-dela de 200) : lit avec la voix du navigateur
+  volumeVoix: 1,            // volume de la voix du navigateur (secours seulement) : 0 a 1
+  vitesseVoix: 0.95,        // vitesse de la voix du navigateur (secours seulement)
+  musiqueNormale: 100,      // volume de la musique YouTube en temps normal : 0 a 100
+  musiqueBaissee: 5,        // volume de la musique pendant le bip + la voix : 0 a 100
+  clignotementMs: 6000      // duree du clignotement a l'arrivee d'une commande (millisecondes)
+};
+
+function attendre(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+/* ---------- 1) BIP : carillon a 3 notes (sol - do - mi), son de cloche ---------- */
+let audioCtx = null;
+function getAudioCtx() {
+  try {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended' && audioCtx.resume) audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+
+// Une note "cloche" = plusieurs harmoniques qui s'eteignent a des vitesses differentes
+function bellNote(ctx, out, freq, t, tau, vol) {
+  // [rapport de frequence, volume relatif, vitesse d'extinction relative]
+  const partials = [[1, 1, 1], [2, 0.45, 0.7], [3, 0.25, 0.5], [4.2, 0.14, 0.35], [5.4, 0.08, 0.25]];
+  partials.forEach(function (p) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    const tp = tau * p[2];
+    o.type = 'sine';
+    o.frequency.value = freq * p[0];
+    o.connect(g); g.connect(out);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol * p[1], t + 0.006);   // attaque nette
+    g.gain.setTargetAtTime(0, t + 0.006, tp);                // extinction douce
+    o.start(t);
+    o.stop(t + 0.006 + tp * 7);
+  });
+}
+
+function playBip() {
+  return new Promise(function (resolve) {
+    const ctx = getAudioCtx();
+    if (!ctx) { resolve(); return; }
+    try {
+      const master = ctx.createGain();
+      master.gain.value = CONFIG_ANNONCE.volumeBip;
+      master.connect(ctx.destination);
+      const t0 = ctx.currentTime + 0.05;
+      bellNote(ctx, master, 784.0, t0, 0.16, 0.4);            // sol
+      bellNote(ctx, master, 1046.5, t0 + 0.16, 0.16, 0.4);    // do
+      bellNote(ctx, master, 1318.5, t0 + 0.32, 0.34, 0.45);   // mi (sonne plus longtemps)
+    } catch (e) {}
+    setTimeout(resolve, 1250);
+  });
+}
+
+/* ---------- 2) VOIX : fichiers MP3 (/1.mp3, /2.mp3 ...), voix du navigateur en secours ---------- */
+// Joue /<numero>.mp3 amplifie. Renvoie true si lu jusqu'au bout, false si fichier introuvable ou illisible
+function jouerMp3(num) {
+  return new Promise(function (resolve) {
+    let fini = false, tGarde = null, audio = null;
+    function terminer(ok) {
+      if (fini) return;
+      fini = true;
+      clearTimeout(tGarde);
+      if (!ok && audio) { try { audio.pause(); } catch (e) {} }
+      resolve(ok);
+    }
+    try {
+      audio = new Audio('/' + num + '.mp3');
+      audio.volume = 1;
+      const ctx = getAudioCtx();
+      if (ctx && ctx.createMediaElementSource && CONFIG_ANNONCE.gainVoix !== 1) {
+        try {   // amplification (le volume d'un <audio> ne depasse pas 1)
+          const src = ctx.createMediaElementSource(audio);
+          const g = ctx.createGain();
+          g.gain.value = CONFIG_ANNONCE.gainVoix;
+          src.connect(g); g.connect(ctx.destination);
+        } catch (e) {}
+      }
+      audio.onended = function () { terminer(true); };
+      audio.onerror = function () { terminer(false); };
+      tGarde = setTimeout(function () { terminer(false); }, 8000);   // securite : on ne laisse jamais la musique baissee
+      const p = audio.play();
+      if (p && p.catch) p.catch(function () { terminer(false); });
+    } catch (e) { terminer(false); }
+  });
+}
+
+function parler(texte) {
+  if (!CONFIG_ANNONCE.voix) return Promise.resolve();
+  const m = String(texte).match(/\d+/);
+  if (!m) return parlerSynthese(texte);
+  return jouerMp3(m[0]).then(function (ok) {
+    if (ok || !CONFIG_ANNONCE.voixDeSecours) return;
+    return parlerSynthese(texte);   // MP3 introuvable : voix du navigateur
+  });
+}
+
+/* ---------- Voix du navigateur (secours) ---------- */
+let frVoice = null;
+function pickVoice() {
+  try {
+    const voices = window.speechSynthesis.getVoices() || [];
+    let best = null;
+    for (let i = 0; i < voices.length; i++) {
+      const l = String(voices[i].lang || '').replace('_', '-').toLowerCase();
+      if (l === 'fr-fr') { best = voices[i]; break; }
+      if (!best && l.indexOf('fr') === 0) best = voices[i];
+    }
+    if (best) frVoice = best;
+  } catch (e) {}
+}
+if ('speechSynthesis' in window) {
+  pickVoice();
+  window.speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+function parlerSynthese(texte) {
+  return new Promise(function (resolve) {
+    if (!CONFIG_ANNONCE.voix || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') { resolve(); return; }
+    let fini = false, tStart = null, tGarde = null;
+    function terminer() {
+      if (fini) return;
+      fini = true;
+      clearTimeout(tStart); clearTimeout(tGarde);
+      resolve();
+    }
+    try {
+      if (!frVoice) pickVoice();
+      const u = new SpeechSynthesisUtterance(texte);
+      u.lang = 'fr-FR';
+      if (frVoice) u.voice = frVoice;
+      u.rate = CONFIG_ANNONCE.vitesseVoix;
+      u.pitch = 1;
+      u.volume = CONFIG_ANNONCE.volumeVoix;
+      u.onstart = function () { clearTimeout(tStart); };
+      u.onend = terminer;
+      u.onerror = terminer;
+      window.__utterance = u;   // garde une reference : sinon certains navigateurs coupent la voix en route
+      tStart = setTimeout(function () { try { window.speechSynthesis.cancel(); } catch (e) {} terminer(); }, 4000);   // la voix ne demarre pas
+      tGarde = setTimeout(terminer, 12000);   // securite : on ne laisse jamais la musique baissee
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(u);
+    } catch (e) { terminer(); }
+  });
+}
+
+function direNumero(num) {
+  const texte = CONFIG_ANNONCE.phrase(num);
+  let p = Promise.resolve();
+  for (let i = 0; i < CONFIG_ANNONCE.repetitions; i++) {
+    p = p.then(function () { return parler(texte); });
+    if (i < CONFIG_ANNONCE.repetitions - 1) p = p.then(function () { return attendre(350); });
+  }
+  return p;
+}
+
+/* ---------- 3) MUSIQUE : baisse le volume du lecteur YouTube pendant l'annonce ---------- */
+let volMusique = CONFIG_ANNONCE.musiqueNormale;   // dernier volume envoye a YouTube
+let duckCount = 0, duckRelease = null, fadeTimer = null;
+
+function ytCommande(func, args) {
+  const f = document.querySelector('#liveFrameWrapper iframe');
+  if (!f || !f.contentWindow) return;
+  try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args || [] }), '*'); } catch (e) {}
+}
+function setVolumeMusique(v) {
+  volMusique = Math.max(0, Math.min(100, Math.round(v)));
+  ytCommande('setVolume', [volMusique]);
+}
+function fondreMusique(cible, ms) {   // changement de volume progressif (pas de coupure seche)
+  clearInterval(fadeTimer);
+  const depart = volMusique, debut = Date.now();
+  if (depart === cible) { setVolumeMusique(cible); return; }
+  fadeTimer = setInterval(function () {
+    const k = Math.min(1, (Date.now() - debut) / ms);
+    setVolumeMusique(depart + (cible - depart) * k);
+    if (k >= 1) clearInterval(fadeTimer);
+  }, 50);
+}
+function baisserMusique() {
+  duckCount++;
+  clearTimeout(duckRelease);
+  fondreMusique(CONFIG_ANNONCE.musiqueBaissee, 250);
+}
+function remonterMusique() {
+  duckCount = Math.max(0, duckCount - 1);
+  if (duckCount > 0) return;   // une autre annonce est encore en attente : la musique reste basse
+  clearTimeout(duckRelease);
+  duckRelease = setTimeout(function () {
+    if (duckCount === 0) fondreMusique(CONFIG_ANNONCE.musiqueNormale, 900);
+  }, 500);
+}
+// Quand le lecteur YouTube est (re)charge, on lui remet le bon volume (il redemarre a 100)
+window.onLiveFrameLoad = function () {
+  [800, 2500, 5000].forEach(function (d) { setTimeout(function () { setVolumeMusique(volMusique); }, d); });
+};
+
+/* ---------- Annonce complete : musique baissee + bip + voix, puis musique remontee ---------- */
+let fileAnnonces = Promise.resolve();   // plusieurs commandes d'un coup = annonces l'une apres l'autre
+function annoncer(num) {
+  baisserMusique();
+  fileAnnonces = fileAnnonces
+    .then(function () { return attendre(280); })   // le temps que la musique baisse
+    .then(function () { return playBip(); })
+    .then(function () { return direNumero(num); })
+    .catch(function () {})
+    .then(function () { remonterMusique(); });
+}
+function testSon() {   // a l'activation du son : un bip pour verifier que le son marche
+  playBip();
+}
+
+/* ---------- 4) CLIGNOTANT : l'ecran clignote quand une nouvelle commande arrive ---------- */
+let blinkTicket = null, blinkTimer = null;
+function applyBlink() {
+  const on = blinkTicket !== null;
+  document.getElementById('tvNum').classList.toggle('blink', on);
+  document.querySelectorAll('.chip').forEach(function (c) {
+    c.classList.toggle('blink', on && c.dataset.num === blinkTicket);
+  });
+}
+function startBlink(num) {
+  blinkTicket = String(num);
+  document.getElementById('flashFrame').classList.add('on');
+  clearTimeout(blinkTimer);
+  blinkTimer = setTimeout(stopBlink, CONFIG_ANNONCE.clignotementMs);
+  applyBlink();
+}
+function stopBlink() {
+  blinkTicket = null;
+  clearTimeout(blinkTimer);
+  document.getElementById('flashFrame').classList.remove('on');
+  applyBlink();
+}
+
+// Numero affiche en gros : la derniere commande arrivee (ou, si elle est partie, la plus recente encore prete)
+function pickMainTicket(readyList) {
+  if (lastReady && readyList.indexOf(String(lastReady)) !== -1) return String(lastReady);
+  let best = readyList[readyList.length - 1], bestTime = -1;
+  readyList.forEach(function (n) {
+    const t = currentReadyTimes[n] || 0;
+    if (t > bestTime) { bestTime = t; best = n; }
+  });
+  return best;
+}
+
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}, 1000);
+
+let audioUnlocked = false;
+document.getElementById('unlockBtn').addEventListener('click', () => {
+  try {
+    getAudioCtx();   // un seul contexte audio, debloque par ce clic, reutilise pour tous les bips
+    audioUnlocked = true;
+    if (typeof window.unmuteLive === 'function') window.unmuteLive();
+    if (typeof ytMuted !== 'undefined') { ytMuted = false; rebuildIframe(); }
+
+    document.getElementById('unlockBtn').classList.add('hidden');
+    testSon();
+  } catch (e) {}
+});
+
+socket.on('connect', () => {
+  console.log('[TV] Connecte au serveur');
+  document.getElementById('connBadge').classList.remove('show');
+  socket.emit('tv:register');
+});
+
+socket.on('disconnect', () => {
+  console.log('[TV] Deconnecte');
+  document.getElementById('connBadge').classList.add('show');
+});
+
+socket.on('connect_error', () => {
+  document.getElementById('connBadge').classList.add('show');
+});
+
+socket.on('tv:registered', ({ code }) => {
+  document.getElementById('pairingCode').textContent = code;
+});
+
+socket.on('tv:tablet-connected', () => {
+  hasBeenConnected = true;
+  document.getElementById('pairing').style.display = 'none';
+  document.getElementById('ticketsView').style.display = 'flex';
+  socket.emit('tv:request-state');
+});
+
+socket.on('tv:tickets-updated', ({ tickets, readyTimes }) => {
+  currentTickets = tickets;
+  currentReadyTimes = readyTimes || {};
+  const newReadySet = new Set(Object.keys(tickets).filter(k => tickets[k] === 'ready'));
+  // Commandes qui viennent de passer en "prete" (celles deja affichees ne comptent pas)
+  const nouveaux = [];
+  newReadySet.forEach(n => { if (!previousReadySet.has(n)) nouveaux.push(n); });
+  previousReadySet = newReadySet;
+  if (firstSync) {
+    // 1ere synchro apres ouverture / rechargement de la page : on ne reannonce pas ce qui est deja pret
+    firstSync = false;
+  } else if (nouveaux.length > 0) {
+    nouveaux.sort((a, b) => (currentReadyTimes[a] || 0) - (currentReadyTimes[b] || 0) || a - b);
+    lastReady = nouveaux[nouveaux.length - 1];
+    startBlink(lastReady);                                    // clignotant (meme si le son n'est pas active)
+    if (audioUnlocked) nouveaux.forEach(n => annoncer(n));    // musique baissee + bip + voix
+  }
+  // Si on recoit des tickets, c'est qu'on est connecte
+  if (Object.keys(tickets).length > 0 || hasBeenConnected) {
+    document.getElementById('pairing').style.display = 'none';
+    document.getElementById('ticketsView').style.display = 'flex';
+  }
+  renderTV();
+});
+
+function formatTime(ms) {
+  if (!ms || ms < 0) return '00:00';
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function getTimerColor(elapsedMs) {
+  const sec = Math.floor(elapsedMs / 1000);
+  if (sec < 120) return '#22c55e';
+  if (sec < 300) return '#f59e0b';
+  return '#ef4444';
+}
+
+function updateTimers() {
+  const tvTimer = document.getElementById('tvTimer');
+  const tvTimerValue = document.getElementById('tvTimerValue');
+  if (mainTicket && currentReadyTimes[mainTicket]) {
+    const elapsed = Date.now() - currentReadyTimes[mainTicket];
+    tvTimerValue.textContent = formatTime(elapsed);
+    tvTimerValue.style.color = getTimerColor(elapsed);
+    tvTimer.style.display = 'block';
+  } else {
+    tvTimer.style.display = 'none';
+  }
+  document.querySelectorAll('.chip').forEach(chip => {
+    const num = chip.dataset.num;
+    if (currentReadyTimes[num]) {
+      const elapsed = Date.now() - currentReadyTimes[num];
+      const timeEl = chip.querySelector('.chip-time');
+      if (timeEl) {
+        timeEl.textContent = formatTime(elapsed);
+        timeEl.style.color = getTimerColor(elapsed);
+      }
+    }
+  });
+}
+setInterval(updateTimers, 1000);
+
+function renderTV() {
+  const readyList = Object.keys(currentTickets).filter(k => currentTickets[k] === 'ready').sort((a, b) => a - b);
+  const chips = document.getElementById('chips');
+  const tvNum = document.getElementById('tvNum');
+  const tvReady = document.getElementById('tvReady');
+  const tvSub = document.getElementById('tvSub');
+  const pulse = document.getElementById('pulse');
+
+  if (readyList.length === 0) {
+    chips.innerHTML = '<span class="empty">Aucune pour l\'instant</span>';
+    tvNum.textContent = '--'; tvNum.style.color = '#333';
+    tvReady.style.display = 'none'; pulse.style.display = 'none';
+    tvSub.textContent = 'En attente de commandes...';
+    tvSub.style.color = '#aaa'; tvSub.style.fontWeight = '400';
+    document.getElementById('tvTimer').style.display = 'none';
+    mainTicket = null;
+    stopBlink();
+  } else {
+    mainTicket = pickMainTicket(readyList);
+    chips.innerHTML = readyList.map(n => {
+      const elapsed = currentReadyTimes[n] ? Date.now() - currentReadyTimes[n] : 0;
+      const color = getTimerColor(elapsed);
+      return '<span class="chip ' + (n == mainTicket ? 'new' : '') + '" data-num="' + n + '">' +
+        '<span class="chip-num">#' + n + '</span>' +
+        '<span class="chip-time" style="color:' + color + '">' + formatTime(elapsed) + '</span>' +
+        '</span>';
+    }).join('');
+    tvNum.textContent = '#' + mainTicket; tvNum.style.color = '#fff';
+    if (blinkTicket && readyList.indexOf(blinkTicket) === -1) stopBlink(); else applyBlink();
+    tvReady.style.display = 'block'; pulse.style.display = 'block';
+    tvSub.textContent = 'Recuperez votre commande au comptoir';
+    tvSub.style.color = '#22c55e'; tvSub.style.fontWeight = '800';
+  }
+  updateTimers();
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
+
+<!-- === LIVE YOUTUBE === -->
+
+
+
+<!-- === LIVE YOUTUBE DYNAMIQUE === -->
+
+
+
+<!-- === LIVE YOUTUBE === -->
+
+
+
+<!-- === LIVE YOUTUBE === -->
+<div id="liveFrameWrapper" style="position:fixed;bottom:16px;right:16px;width:320px;height:180px;border-radius:14px;overflow:hidden;border:1px solid #2a2a2a;background:#000;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:60;">
+  <iframe id="liveFrame" width="320" height="180"
+    src="https://www.youtube.com/embed/b-bK2Vn3D38?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0&enablejsapi=1"
+    title="Live YouTube" frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</div>
+
+<script>
+/* === LIVE YOUTUBE === */
+(function() {
+  let liveType = 'video';
+  let liveId = 'b-bK2Vn3D38';
+  let liveMuted = true;
+
+  function buildLiveUrl() {
+    const muteParam = liveMuted ? '1' : '0';
+    const common = 'autoplay=1&mute=' + muteParam + '&playsinline=1&modestbranding=1&rel=0&enablejsapi=1';
+    if (liveType === 'playlist') {
+      return 'https://www.youtube.com/embed/videoseries?list=' + liveId + '&' + common;
+    }
+    return 'https://www.youtube.com/embed/' + liveId + '?' + common;
+  }
+
+  function updateLiveFrame() {
+    const wrapper = document.getElementById('liveFrameWrapper');
+    if (!wrapper) return;
+    wrapper.innerHTML = '';
+    const f = document.createElement('iframe');
+    f.width = '320';
+    f.height = '180';
+    f.frameBorder = '0';
+    f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+    f.referrerPolicy = 'strict-origin-when-cross-origin';
+    f.allowFullscreen = true;
+    f.addEventListener('load', function () { if (typeof window.onLiveFrameLoad === 'function') window.onLiveFrameLoad(); });
+    f.src = buildLiveUrl();
+    wrapper.appendChild(f);
+    console.log('[LIVE] Frame update: type=' + liveType + ' id=' + liveId + ' muted=' + liveMuted);
+  }
+
+  // Attendre que socket soit dispo
+  function hookSocket() {
+    if (typeof socket === 'undefined') {
+      setTimeout(hookSocket, 300);
+      return;
+    }
+
+    socket.on('music:state', function(state) {
+      if (!state) return;
+      let changed = false;
+      if (state.type && state.type !== liveType) { liveType = state.type; changed = true; }
+      const newId = (state.type === 'playlist' && state.playlistId) ? state.playlistId : state.videoId;
+      if (newId && newId !== liveId) { liveId = newId; changed = true; }
+      if (state.muted !== undefined && state.muted !== liveMuted) { liveMuted = state.muted; changed = true; }
+      const wrapper = document.getElementById('liveFrameWrapper');
+      if (wrapper) wrapper.style.display = state.hidden ? 'none' : 'block';
+      if (changed) updateLiveFrame();
+    });
+
+    socket.on('music:video-changed', function(state) {
+      if (!state) return;
+      if (state.type) liveType = state.type;
+      const newId = (state.type === 'playlist' && state.playlistId) ? state.playlistId : state.videoId;
+      if (newId) liveId = newId;
+      liveMuted = false;
+      const wrapper = document.getElementById('liveFrameWrapper');
+      if (wrapper) wrapper.style.display = 'block';
+      updateLiveFrame();
+    });
+
+    socket.on('music:reload', function() { updateLiveFrame(); });
+
+    setTimeout(function() { socket.emit('music:request-state'); }, 500);
+  }
+
+  hookSocket();
+
+  // Exposer pour le bouton "Activer le son"
+  window.unmuteLive = function() {
+    liveMuted = false;
+    updateLiveFrame();
+  };
+})();
+</script>
+</body>
+</html>
