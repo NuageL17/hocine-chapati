@@ -319,7 +319,7 @@ function annoncer(num) {
     .then(function () { return playBip(); })
     .then(function () { return direNumero(num); })
     .catch(function () {})
-    .then(function () { remonterMusique(); });
+    .then(function () { remonterMusique(); setTimeout(function(){ ytCommande('playVideo', []); }, 500); });
 }
 function testSon() {   // a l'activation du son : un bip pour verifier que le son marche
   playBip();
